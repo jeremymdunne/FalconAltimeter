@@ -64,7 +64,7 @@ Raw_Flight_Data buffferedFlightData;
 
 
 #define SEND_FILE "SF"
-#define SEND_FAT_TABLE "SF"
+#define SEND_FAT_TABLE "ST"
 #define WRITE_CONFIGURATION "WC"
 #define ERASE_FILE "FE"
 #define SEND_CONFIGURATION "SC"
@@ -177,15 +177,16 @@ int handleComputerSend(String *message, bool requestAck){
   //encode in a standard start char, checkSum, endChar
   String temp;
   while(computerBuffer.available()) computerBuffer.readLine(&temp);
-  String newMessage = START_CHAR + newMessage + "*" + String(computeChecksum(*message)) + "\n";
+  String newMessage = START_CHAR + *message + "*" + String(computeChecksum(*message)) + "\n";
   //go and send the message and wait for an ack
   int attempt = 0;
   long timeStart = millis();
   while((attempt < NUMBER_OF_ATTEMPTS) & (millis()-timeStart < COMPUTER_COMMUNICATION_TIMEOUT)){
     Serial.print(newMessage);
     while(computerBuffer.available() <= 0 && (millis() - timeStart < COMPUTER_COMMUNICATION_TIMEOUT));
+    if(computerBuffer.available() <= 0) break;
     computerBuffer.readLine(&temp);
-    if(temp.indexOf(ACKNOWLEDGE)) return 0;
+    if(temp.indexOf(ACKNOWLEDGE) >= 0) return 0;
   }
   return COMMS_FAILURE;
 }
@@ -195,18 +196,27 @@ void sendErrorToComputer(String message){
   message = SEND_ERROR+message;
   handleComputerSend(&message);
 }
-
+int getFileIndexFromMessage(String message, int *index){
+  int start = message.indexOf(":") + 1;
+  if(start < 0) {
+    sendErrorToComputer("NO FILE INDEX");
+    return -1;
+  }
+  int end = message.length();
+  //if(message.indexOf('\n') >= 0) end = message.indexOf('\n');
+  Serial.println("Parsed index: " + message.substring(start,end));
+  *index = atoi(message.substring(start, end).c_str());
+}
 int handleFileSendRequest(String message){
   //go parse the message for a file index
-  int start = message.indexOf(":");
-  int end = message.length();
-  if(message.indexOf('\n') >= 0) end = message.indexOf('\n');
-  int index = atoi(message.substring(start, end).c_str());
+  int index;
+  if(getFileIndexFromMessage(message, &index) != 0) return -1;
   if(index < 0 || index > fileStructure.numberOfFiles-1){
     //error!
     sendErrorToComputer("INVALID FILE INDEX");
     return -1;
   }
+  Serial.println("Opening file index: " + String(index));
   //otherwise, lets start a stream
   fileSystem.openForRead(index);
   //go and send
@@ -225,18 +235,27 @@ int reportOpenedFileContents(){
   //need some look ahead
   //byte dataDescriptor = 0;
   String computerMessage;
-  status = fileSystem.readStream(&primary[0], 1);
-  switch((int)primary[0]){
-    case (RAW_FLIGHT_DATA_DATA_DESCRIPTOR):
-      //grab the remaining length
-      status = fileSystem.readStream(&primary[1],RAW_FLIGHT_DATA_SIZE-1);
-      status = decodeRawFlightDataFromDataStorage(&primary[0], &buffferedFlightData);
-      computerMessage = encodeRawFlightDataForComputer(&buffferedFlightData);
-      handleComputerSend(&computerMessage);
-      break;
-    default:
-      //todo
-      break;
+  while(fileSystem.readStream(&primary[0], 1) > 0){
+    switch((int)primary[0]){
+      case (RAW_FLIGHT_DATA_DATA_DESCRIPTOR):
+        Serial.println("RAW FLIGHT DATA");
+        //grab the remaining length
+        status = fileSystem.readStream(&primary[1],RAW_FLIGHT_DATA_SIZE-1);
+        for(int i = 0; i < RAW_FLIGHT_DATA_SIZE; i ++){
+          Serial.print(String(primary[i]) + "\t");
+        }
+        status = decodeRawFlightDataFromDataStorage(&primary[0], &buffferedFlightData);
+        computerMessage = encodeRawFlightDataForComputer(&buffferedFlightData);
+        status = handleComputerSend(&computerMessage);
+        if(status == COMMS_FAILURE){
+          sendErrorToComputer("FILE_SEND_SERIAL_FAILURE");
+          return -1;
+        }
+        break;
+      default:
+        //todo
+        break;
+      }
   }
   return 0;
 }
@@ -264,18 +283,30 @@ void handleFatRequest(String message){
   }
 }
 
+int handleEraseRequest(String message){
+  //get the file index
+  //int index;
+  //if(getFileIndexFromMessage(message, &index) != 0) return -1;
+  //
+  fileSystem.eraseLastFile();
+  fileSystem.readLookupTable(&fileStructure);
+  return 0;
+}
+
 //this is how we communicate with the computer
 int handleComputerCommunication(String message){
   //main handler
   //check what the message is, handle appropriately
   if(message.indexOf(SEND_FILE)>=0){
+    Serial.println("Sending file!");
     handleFileSendRequest(message);
   }
   else if(message.indexOf(SEND_FAT_TABLE)>=0){
     handleFatRequest(message);
+
   }
   else if(message.indexOf(ERASE_FILE)>=0){
-    //handleEraseRequest(message);
+    handleEraseRequest(message);
   }
   else{
 
@@ -338,7 +369,7 @@ int CircularBufferIndexer::readFromStart(uint *buffer){
   if(minSizeCounter >= size){
     for(uint i = 0; i < size; i ++){
       uint actual = counter + i;
-      if(counter >= size) counter -= size;
+      if(actual >= size) actual -= size;
       buffer[i] = actual;
     }
     return size; //tell them we gots a full buffer
@@ -357,7 +388,7 @@ int CircularBufferIndexer::readFromEnd(uint *buffer){
   if(minSizeCounter >= size){
     for(uint i = 0; i < size; i ++){
       uint actual = counter - i;
-      if(counter < 0) counter += size;
+      if(actual < 0) actual += size;
       buffer[i] = actual;
     }
     return size; //tell them we gots a full buffer
@@ -385,7 +416,7 @@ int CircularBufferIndexer::add(){
   //do 2* just in case removes are called frequently
   if(minSizeCounter<2*size) minSizeCounter ++;
   //check bounds
-  if(counter + 1 >= size){
+  if(counter + 1 > size){
     counter = 0;
     return size;
   }
@@ -418,7 +449,7 @@ void CircularBufferIndexer::clear(){
 #define ACCEL
 #define GYRO
 #define PRESSURE_ALT
-//#define RADIO
+//#define RADIO_TELEMETRY
 #define SERIAL_FEED_THROUGH
 
 enum FLIGHT_PHASES{
@@ -457,20 +488,48 @@ void recordFlight(){
 
 }
 
+void makeDummyFile(){
+  fileSystem.openToWrite();
+  byte buffer[256];
+  for(int i = 0; i < 256; i ++){
+    buffer[i] = i;
+  }
+  fileSystem.write(&buffer[0], 256);
+  fileSystem.close();
+}
 
+void makeDummyFlightFile(){
+  Raw_Flight_Data data;
+  fileSystem.openToWrite();
+  byte tempHold[RAW_FLIGHT_DATA_SIZE];
+  for(int i = 0; i < 256; i ++){
+    data.timeStamp = i*10;
+    data.acceleration = i/100.0;
+    data.pressureAlt = i*2;
+    encodeRawFlightDataForDataStorage(&tempHold[0], &data);
+    fileSystem.write(&tempHold[0],RAW_FLIGHT_DATA_SIZE);
+  }
+  fileSystem.close();
+}
 
 
 void setup() {
   Serial.begin(115200);
   delay(2000);
+  //testCircularBuffer();
+  //while(true);
   Serial.println("Beginning!");
   String message;
+  initFileSystem();
+  makeDummyFlightFile();
+  //fileSystem.makeFileAllocationTable();
   while(true){
     while(computerBuffer.available() <=0){
       delay(1);
     }
     computerBuffer.readLine(&message);
     Serial.println("Recieved Message: " + message);
+    handleComputerCommunication(message);
   }
   /*
   status = initFileSystem();

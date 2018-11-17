@@ -53,9 +53,9 @@ public:
   int eraseAll(bool saveFirstSector = false, bool makeLookupTable = true);
   int eraseLastFile();
   int eraseAllFiles();
+  int makeFileAllocationTable();
 private:
   bool checkIfAddressHasData(ulong address, int numToCheck = 10);
-  int makeFileAllocationTable();
   int writeNewFileAllocationTable(FILE_ALLOCATION_TABLE_STRUCTURE *newTable);
   int attemptFileRecover(FILE_ALLOCATION_TABLE_STRUCTURE *mostComplete);
   int writeBufferToFlash(ulong address, int n);

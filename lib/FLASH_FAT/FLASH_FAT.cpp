@@ -82,6 +82,12 @@ int FLASH_FAT::init(int ssPin, bool initSPI, bool eraseChip){
   if(eraseChip){
     eraseAll();
   }
+  status = readLookupTable(&reference);
+  if(status == NO_FILE_ALLOCATION_TABLE){
+    //make one
+    Serial.println("No File allocation table found! Making one!");
+    makeFileAllocationTable();
+  }
   return 0;
 }
 
@@ -240,10 +246,11 @@ int FLASH_FAT::openToWrite(){
   //assume our address is the next available 4kb block following the last used spot
 
   ulong start;
+  readLookupTable(&reference);
   if(reference.numberOfFiles > 0) start = (((reference.files[reference.numberOfFiles-1].startAddress + reference.files[reference.numberOfFiles-1].size) >> 12) + 1) << 12;
   else start = ((FILE_ALLOCATION_TABLE_ADDRESS >> 12) + 1) << 12;
-  Serial.println("Next available address: " + String(start));
-  Serial.println("Number of files:" + String(reference.numberOfFiles));
+  //Serial.println("Next available address: " + String(start));
+  //Serial.println("Number of files:" + String(reference.numberOfFiles));
   if(start >= 8388607L) return NO_AVAILABLE_SPACE;
   //add it to the table
   currentMode = WRITE;
@@ -344,7 +351,7 @@ int FLASH_FAT::writeNewFileAllocationTable(FILE_ALLOCATION_TABLE_STRUCTURE *newT
   while(flash->isBusy());
   tempBuffer[0] = newTable->numberOfFiles;
   for(int i = 0; i < newTable->numberOfFiles; i ++){
-    Serial.println("Writing start address " + String(newTable->files[i].startAddress) + " to FAT");
+    //Serial.println("Writing start address " + String(newTable->files[i].startAddress) + " to FAT");
     //convert the table address values into 24 bit equivalent
     tempBuffer[6*i+1] = (newTable->files[i].startAddress >> 16) & 0xFF;
     tempBuffer[6*i+2] = newTable->files[i].startAddress >> 8 & 0xFF;
@@ -369,22 +376,6 @@ int FLASH_FAT::makeFileAllocationTable(){
   return writeBufferToFlash(FILE_ALLOCATION_TABLE_ADDRESS,256);
 }
 
-int FLASH_FAT::readLookupTableForNumberOfFiles(uint8 *numFiles){
-  //go grab the first 2 bytes at the lookup file location
-  status = flash->read(FILE_ALLOCATION_TABLE_ADDRESS, &tempBuffer[0], 1);
-  if(status != 0) return status;
-  *numFiles = (tempBuffer[0]);
-  //real quick, if numFiles == 255|255, there is no file allocation table, so fix that and report it
-  if(*numFiles == 255){
-    makeFileAllocationTable();
-    *numFiles = 0;
-    reference.numberOfFiles = 0;
-    return NO_FILE_ALLOCATION_TABLE;
-  }
-  reference.numberOfFiles = *numFiles;
-  return 0;
-}
-
 int FLASH_FAT::readLookupTable(FILE_ALLOCATION_TABLE_STRUCTURE *target){
   //read the first 2 bytes
   while(flash->isBusy());
@@ -394,7 +385,7 @@ int FLASH_FAT::readLookupTable(FILE_ALLOCATION_TABLE_STRUCTURE *target){
   //store that in target
   //if(tempBuffer[0] == 255) makeFileAllocationTable();
   target->numberOfFiles = (tempBuffer[0]);
-  Serial.println("Number of files found in the lookup table:" + String(target->numberOfFiles));
+  //Serial.println("Number of files found in the lookup table:" + String(target->numberOfFiles));
   //read the next appropriate number of bytes
   //byte tempStoreBuffer[target->numberOfFiles*6]; //just in case its bigger than 256
   status = flash->waitUntilFree();
@@ -412,7 +403,7 @@ int FLASH_FAT::readLookupTable(FILE_ALLOCATION_TABLE_STRUCTURE *target){
   for(int i = 0; i < target->numberOfFiles; i ++){
     target->files[i].startAddress = (tempBuffer[i*6+1] << 16) | (tempBuffer[i*6+2] << 8) | (tempBuffer[i*6+3]);
     target->files[i].size = (tempBuffer[i*6+4] << 16) | (tempBuffer[i*6+5] << 8) | (tempBuffer[i*6+6]);
-    Serial.println("File found in allocation table: " + String(i) + " Start: " + String(target->files[i].startAddress) + " Size: " + String(target->files[i].size));
+    //Serial.println("File found in allocation table: " + String(i) + " Start: " + String(target->files[i].startAddress) + " Size: " + String(target->files[i].size));
   }
   //check the last file's end address
   if(target->files[target->numberOfFiles-1].size == ((255|255)|255)){
