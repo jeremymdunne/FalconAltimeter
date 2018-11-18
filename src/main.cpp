@@ -2,6 +2,8 @@
 #include <FLASH_FAT.h>
 #include <BMP280.h>
 #include <SerialBuffer.h>
+#include <DataConfig.h>
+#include <CircularBufferIndexer.h>
 //#include <MPU9250_IMU.h>
 
 FLASH_FAT fileSystem;
@@ -10,73 +12,73 @@ BMP280 pressureSensor;
 //MPU9250_IMU imu;
 
 int status = 0;
-
-struct Raw_Flight_Data{
-  ulong timeStamp;
-  float pressureAlt;
-  float acceleration;
-};
-
-struct Rocket_Attitude_Estimations{
-  ulong timeStamp;
-  float xOrientation;
-  float yOrientation;
-  float zOrientation;
-};
-
-struct Flight_Estimations{
-  ulong timeStamp;
-  float estimatedVelocity;
-  float estimatedApogee;
-};
-
-struct GPS_data{
-  ulong timeStamp;
-  String latitude;
-  String longitude;
-  ulong altitude;
-  ulong gpsTime;
-};
-
-struct Event_Data{
-  ulong timeStamp;
-  int dataMembers;
-  float *data;
-};
-
-
 Raw_Flight_Data buffferedFlightData;
+SerialBuffer computerBuffer;
+
+/*
+  handles all sensors on the rocket
+  handles proper timing of data collection
+  requires high update speeds
+*/
 
 
+enum SensorType{
+  GPS, ACCEL, MAG, GYRO, PRESSURE_ALT
+};
+
+struct SensorData{
+  SensorType sensorType;
+  ulong sysTimeStampe;
+  float *floatData;
+  uint numData;
+};
+
+class SensorPackage{
+public:
+  //returns codes for successfully initialized sensors
+  int init();
+  //returns codes for available new sensor data
+  int update();
+private:
+
+
+};
+
+class ComputerCommunication{
+public:
+  enum Communication_Type{
+    VERBOSE, STATEMENT, ERROR
+  };
+  int init();
+  int available();
+  int readLine(String &msg);
+  //this will encode the string with checksums as appropriate
+  int sendData(String *data, Communication_Type type = STATEMENT);
+private:
+  int handleSend(String &msg, Communication_Type type = STATEMENT);
+};
+
+class FlightKinematics{
+
+};
+
+class TelemetryController{
+
+};
+
+class StorageController{
+public:
+  int init();
+  int write();
+  int
+};
+
+class FlightController{
+
+};
 
 //these are important for converting floats and larger values into bytes. Do lose resolution, but so what?
 
-#define ALTITUDE_SCALE_FACTOR 550  //~2^24/(30480)
-#define TIME_SCALE_FACTOR 1000
-#define ACCELERATION_SCALE_FACTOR 300 //~2^16/(20*9.81)
-#define VELOCITY_SCALE_FACTOR 90  //~2^16/(343*2)
-#define ORIENTATION_SCALE_FACTOR
-
-#define RAW_FLIGHT_DATA_DATA_DESCRIPTOR 1
-#define RAW_FLIGHT_DATA_SIZE 9
-#define FLIGHT_ESTIMATION_DATA_TAG 2
-#define GPS_DATA_TAG 3
-
-
-#define SEND_FILE "SF"
-#define SEND_FAT_TABLE "ST"
-#define WRITE_CONFIGURATION "WC"
-#define ERASE_FILE "FE"
-#define SEND_CONFIGURATION "SC"
-#define SEND_ERROR "ERR:"
-
-#define ACKNOWLEDGE "ACK"
-#define FAILURE "FAIL"
-
-#define START_CHAR "$"
-#define NUMBER_OF_ATTEMPTS 5
-#define COMPUTER_COMMUNICATION_TIMEOUT 5000
-#define COMMS_FAILURE -57
 
 //example: SF:0 //send file 0
 
@@ -125,8 +127,8 @@ int encodeRawFlightDataForDataStorage(byte *target, Raw_Flight_Data *data){
 
 int decodeRawFlightDataFromDataStorage(byte *toDecode, Raw_Flight_Data *target){
   target->timeStamp = (ulong)(toDecode[1] << 16) | (toDecode[2] << 8) | (toDecode[3]);
-  target->pressureAlt = (float)(((toDecode[4] << 16) | (toDecode[5] << 8) | (toDecode[6]))/ALTITUDE_SCALE_FACTOR);
-  target->acceleration = (float)(((toDecode[7] << 8) | (toDecode[8]))/ACCELERATION_SCALE_FACTOR);
+  target->pressureAlt = (float)((toDecode[4] << 16) | (toDecode[5] << 8) | (toDecode[6]))/ALTITUDE_SCALE_FACTOR;
+  target->acceleration = (float)((toDecode[7] << 8) | (toDecode[8]))/ACCELERATION_SCALE_FACTOR;
   return 0;
 }
 
@@ -163,7 +165,7 @@ int encodeGpsData(byte *target, GPS_data *data){
   return encodeGpsData(target, data->timeStamp, data->latitude, data->longitude);
 }
 
-SerialBuffer computerBuffer;
+
 
 int computeChecksum(String message){
   int check = 0;
@@ -206,7 +208,9 @@ int getFileIndexFromMessage(String message, int *index){
   //if(message.indexOf('\n') >= 0) end = message.indexOf('\n');
   Serial.println("Parsed index: " + message.substring(start,end));
   *index = atoi(message.substring(start, end).c_str());
+  return 0;
 }
+
 int handleFileSendRequest(String message){
   //go parse the message for a file index
   int index;
@@ -238,12 +242,14 @@ int reportOpenedFileContents(){
   while(fileSystem.readStream(&primary[0], 1) > 0){
     switch((int)primary[0]){
       case (RAW_FLIGHT_DATA_DATA_DESCRIPTOR):
-        Serial.println("RAW FLIGHT DATA");
+        //Serial.println("RAW FLIGHT DATA");
         //grab the remaining length
         status = fileSystem.readStream(&primary[1],RAW_FLIGHT_DATA_SIZE-1);
+        /*
         for(int i = 0; i < RAW_FLIGHT_DATA_SIZE; i ++){
           Serial.print(String(primary[i]) + "\t");
         }
+        */
         status = decodeRawFlightDataFromDataStorage(&primary[0], &buffferedFlightData);
         computerMessage = encodeRawFlightDataForComputer(&buffferedFlightData);
         status = handleComputerSend(&computerMessage);
@@ -254,6 +260,7 @@ int reportOpenedFileContents(){
         break;
       default:
         //todo
+        Serial.println("Unrecognized!");
         break;
       }
   }
@@ -278,8 +285,8 @@ void handleFatRequest(String message){
   }
   //go and send it
   status = handleComputerSend(&totalMessage);
-  if(status != 0){
-    Serial.println("FAT Send to the user failed: " + String(status));
+  if(status == COMMS_FAILURE){
+    sendErrorToComputer("FILE_FAT_SERIAL_FAILURE");
   }
 }
 
@@ -298,7 +305,7 @@ int handleComputerCommunication(String message){
   //main handler
   //check what the message is, handle appropriately
   if(message.indexOf(SEND_FILE)>=0){
-    Serial.println("Sending file!");
+    //Serial.println("Sending file!");
     handleFileSendRequest(message);
   }
   else if(message.indexOf(SEND_FAT_TABLE)>=0){
@@ -336,104 +343,6 @@ int initFileSystem(){
   return 0;
 }
 
-class CircularBufferIndexer{
-public:
-  CircularBufferIndexer(uint size);
-  CircularBufferIndexer(){}
-  void init(uint size);
-  int add(); //returns the index to place the member in
-  void removeLast();
-  int readFromStart(uint *buffer);
-  int readFromEnd(uint *buffer);
-  void clear();
-private:
-  uint counter; //points at the next member to fill
-  uint minSizeCounter; //this is used if the available buffer is less than size
-  uint size = 0;
-};
-
-CircularBufferIndexer::CircularBufferIndexer(uint size){
-  this->size = size;
-  counter = 0;
-  minSizeCounter = 0;
-}
-
-void CircularBufferIndexer::init(uint size){
-  this->size = size;
-  counter = 0;
-  minSizeCounter = 0;
-}
-
-int CircularBufferIndexer::readFromStart(uint *buffer){
-  //read from the start index
-  if(minSizeCounter >= size){
-    for(uint i = 0; i < size; i ++){
-      uint actual = counter + i;
-      if(actual >= size) actual -= size;
-      buffer[i] = actual;
-    }
-    return size; //tell them we gots a full buffer
-  }
-  else{
-    //its going to read from 0 to the minSize
-    for(uint i = 0; i < minSizeCounter; i ++){
-      buffer[i] = i;
-    }
-    return minSizeCounter;
-  }
-}
-
-int CircularBufferIndexer::readFromEnd(uint *buffer){
-  //read from the start index
-  if(minSizeCounter >= size){
-    for(uint i = 0; i < size; i ++){
-      uint actual = counter - i;
-      if(actual < 0) actual += size;
-      buffer[i] = actual;
-    }
-    return size; //tell them we gots a full buffer
-  }
-  else{
-    //its going to read from 0 to the minSize
-    for(uint i = minSizeCounter - 1; i >= 0; i --){
-      buffer[minSizeCounter-1 - i] = i;
-    }
-    return minSizeCounter;
-  }
-}
-
-void CircularBufferIndexer::removeLast(){
-  //check bounds
-  if(counter - 1 < 0){
-    counter = size-1;
-  }
-  else{
-    counter --;
-  }
-}
-
-int CircularBufferIndexer::add(){
-  //do 2* just in case removes are called frequently
-  if(minSizeCounter<2*size) minSizeCounter ++;
-  //check bounds
-  if(counter + 1 > size){
-    counter = 0;
-    return size;
-  }
-  else{
-    counter ++;
-    return counter - 1;
-  }
-  return -1;
-}
-
-void CircularBufferIndexer::clear(){
-  counter = 0;
-  minSizeCounter = 0;
-}
-
-
-
 /*
   recordFlight
   main function for flight routines
@@ -444,37 +353,8 @@ void CircularBufferIndexer::clear(){
   the waitForLaunch uses a circular buffer of ~5 seconds
 */
 
-//these are flags that can be commented out as needed
-//#define GPS
-#define ACCEL
-#define GYRO
-#define PRESSURE_ALT
-//#define RADIO_TELEMETRY
-#define SERIAL_FEED_THROUGH
-
-enum FLIGHT_PHASES{
-  WAITING_FOR_LAUNCH,BOOST_PHASE,COAST_PHASE,APOGEE,RECOVERY,LANDING,STANDBY
-};
-//flight
-#define FLIGHT_DATA_STORAGE_HERTZ_DURING_FLIGHT 20
-#define GPS_DATA_STORAGE_HERTZ_DURING_FLIGHT 1
-#define FLIGHT_ESTIMATION_STORAGE_HERTZ_DURING_FLIGHT 2
-
-#define FLIGHT_DATA_TELEMETRY_HERTZ_DURING_FLIGHT 2
-#define GPS_DATA_TELEMETRY_HERTZ_DURING_FLIGHT .5
-#define FLIGHT_ESTIMATION_TELEMETRY_HERTZ_DURING_FLIGHT .5
-//recovery
-#define FLIGHT_DATA_STORAGE_HERTZ_DURING_RECOVERY 2
-#define GPS_DATA_STORAGE_HERTZ_DURING_RECOVERY 1
-#define FLIGHT_ESTIMATION_STORAGE_HERTZ_DURING_RECOVERY 0
-
-#define FLIGHT_DATA_TELEMETRY_HERTZ_DURING_RECOVERY 2
-#define GPS_DATA_TELEMETRY_HERTZ_DURING_RECOVERY .5
-#define FLIGHT_ESTIMATION_TELEMETRY_HERTZ_DURING_RECOVERY 0
-
-
-Raw_Flight_Data flightDataPreLaunchBuffer[50];
-GPS_data gpsDataPreLaunchBuffer[5];
+Raw_Flight_Data flightDataPreLaunchBuffer[PRE_LAUNCH_RAW_FLIGHT_BUFFER_SIZE];
+GPS_data gpsDataPreLaunchBuffer[PRE_LAUNCH_GPS_BUFFER_SIZE];
 
 CircularBufferIndexer flightDataPreLaunchBufferIndexer;
 CircularBufferIndexer gpsDataPreLaunchBufferIndexer;
@@ -483,8 +363,67 @@ CircularBufferIndexer gpsDataPreLaunchBufferIndexer;
 bool serialInterrupt = false;
 
 
+bool checkForLaunch(){
+  return false;
+}
+
+FLIGHT_PHASES currentPhase;
+
+void handleStandDown(){
+  switch(currentPhase){
+    case(WAITING_FOR_LAUNCH):
+      break;
+    case(BOOST_PHASE):
+      break;
+    case(COAST_PHASE):
+      break;
+    case(APOGEE):
+      break;
+    case(RECOVERY):
+      break;
+    case(LANDING):
+      break;
+    case(STANDBY):
+      break;
+  }
+}
+
+
+
+void checkPhaseChange(){
+  switch(currentPhase){
+    case(WAITING_FOR_LAUNCH):
+      break;
+    case(BOOST_PHASE):
+      break;
+    case(COAST_PHASE):
+      break;
+    case(APOGEE):
+      break;
+    case(RECOVERY):
+      break;
+    case(LANDING):
+      break;
+    case(STANDBY):
+      break;
+  }
+}
 
 void recordFlight(){
+  //main idea is to check and handle user commands
+  if(computerBuffer.available() > 0){
+    if(!serialInterrupt){
+      serialInterrupt = true;
+      handleStandDown();
+    }
+    String message;
+    computerBuffer.readLine(&message);
+    handleComputerCommunication(message);
+  }
+  if(!serialInterrupt){
+    //standard data collection
+    checkPhaseChange();
+  }
 
 }
 
