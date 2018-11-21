@@ -4,16 +4,26 @@
 #include <SerialBuffer.h>
 #include <DataConfig.h>
 #include <CircularBufferIndexer.h>
+
+#include <StorageController.h>
+#include <HostCommunicator.h>
+#include <SensorPackage.h>
+
 //#include <MPU9250_IMU.h>
 
+CircularBufferIndexer indexer;
 FLASH_FAT fileSystem;
 FILE_ALLOCATION_TABLE_STRUCTURE fileStructure;
 BMP280 pressureSensor;
 //MPU9250_IMU imu;
 
+StorageController storageController;
+HostCommunicator hostCommunicator;
+SensorPackage sensorPackage;
+
 int status = 0;
 Raw_Flight_Data buffferedFlightData;
-SerialBuffer computerBuffer;
+
 
 /*
   handles all sensors on the rocket
@@ -22,56 +32,15 @@ SerialBuffer computerBuffer;
 */
 
 
-enum SensorType{
-  GPS, ACCEL, MAG, GYRO, PRESSURE_ALT
-};
-
-struct SensorData{
-  SensorType sensorType;
-  ulong sysTimeStampe;
-  float *floatData;
-  uint numData;
-};
-
-class SensorPackage{
-public:
-  //returns codes for successfully initialized sensors
-  int init();
-  //returns codes for available new sensor data
-  int update();
-private:
 
 
-};
 
-class ComputerCommunication{
-public:
-  enum Communication_Type{
-    VERBOSE, STATEMENT, ERROR
-  };
-  int init();
-  int available();
-  int readLine(String &msg);
-  //this will encode the string with checksums as appropriate
-  int sendData(String *data, Communication_Type type = STATEMENT);
-private:
-  int handleSend(String &msg, Communication_Type type = STATEMENT);
-};
 
 class FlightKinematics{
 
 };
 
-class TelemetryController{
 
-};
-
-class StorageController{
-public:
-  int init();
-  int write();
-  int
-};
 
 class FlightController{
 
@@ -167,31 +136,6 @@ int encodeGpsData(byte *target, GPS_data *data){
 
 
 
-int computeChecksum(String message){
-  int check = 0;
-  for(uint i = 0; i < message.length(); i ++){
-    check = check ^ message.charAt(i);
-  }
-  return check;
-}
-
-int handleComputerSend(String *message, bool requestAck){
-  //encode in a standard start char, checkSum, endChar
-  String temp;
-  while(computerBuffer.available()) computerBuffer.readLine(&temp);
-  String newMessage = START_CHAR + *message + "*" + String(computeChecksum(*message)) + "\n";
-  //go and send the message and wait for an ack
-  int attempt = 0;
-  long timeStart = millis();
-  while((attempt < NUMBER_OF_ATTEMPTS) & (millis()-timeStart < COMPUTER_COMMUNICATION_TIMEOUT)){
-    Serial.print(newMessage);
-    while(computerBuffer.available() <= 0 && (millis() - timeStart < COMPUTER_COMMUNICATION_TIMEOUT));
-    if(computerBuffer.available() <= 0) break;
-    computerBuffer.readLine(&temp);
-    if(temp.indexOf(ACKNOWLEDGE) >= 0) return 0;
-  }
-  return COMMS_FAILURE;
-}
 
 void sendErrorToComputer(String message){
   //encode it
@@ -408,7 +352,7 @@ void checkPhaseChange(){
       break;
   }
 }
-
+/*
 void recordFlight(){
   //main idea is to check and handle user commands
   if(computerBuffer.available() > 0){
@@ -426,7 +370,7 @@ void recordFlight(){
   }
 
 }
-
+*/
 void makeDummyFile(){
   fileSystem.openToWrite();
   byte buffer[256];
@@ -459,9 +403,19 @@ void setup() {
   //while(true);
   Serial.println("Beginning!");
   String message;
+  ComputerCommunication coms;
+  coms.init();
+  String msg;
+  while(true){
+    if(coms.available()){
+      coms.readLine(&msg);
+      Serial.println("RECEIVED: " + msg);
+    }
+  }
   initFileSystem();
   makeDummyFlightFile();
   //fileSystem.makeFileAllocationTable();
+  /*
   while(true){
     while(computerBuffer.available() <=0){
       delay(1);
@@ -470,6 +424,7 @@ void setup() {
     Serial.println("Recieved Message: " + message);
     handleComputerCommunication(message);
   }
+  */
   /*
   status = initFileSystem();
   if(status < 0){

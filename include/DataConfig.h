@@ -1,5 +1,3 @@
-
-
 #define ALTITUDE_SCALE_FACTOR 550  //~2^24/(30480)
 #define TIME_SCALE_FACTOR 1000
 #define ACCELERATION_SCALE_FACTOR 300 //~2^16/(20*9.81)
@@ -22,7 +20,9 @@
 #define ACKNOWLEDGE "ACK"
 #define FAILURE "FAIL"
 
-#define START_CHAR "$"
+#define START_STATEMENT_CHAR "$"
+#define START_VERBOSE_CHAR "#"
+#define HOST_START_CHAR "@"
 #define NUMBER_OF_ATTEMPTS 5
 #define COMPUTER_COMMUNICATION_TIMEOUT 5000
 #define COMMS_FAILURE -57
@@ -80,7 +80,7 @@ enum FLIGHT_PHASES{
 struct Raw_Flight_Data{
   ulong timeStamp;
   float pressureAlt;
-  float acceleration;
+  float linearAcceleration;
 };
 
 struct Rocket_Attitude_Estimations{
@@ -108,4 +108,28 @@ struct Event_Data{
   ulong timeStamp;
   int dataMembers;
   float *data;
+};
+
+enum SensorType{
+  SENSOR_GPS, SENSOR_ACCEL, SENSOR_MAG, SENSOR_GYRO, SENSOR_PRESSURE_ALT, NOT_VALID_SENSOR_DATA
+};
+
+struct SensorData{
+  SensorType sensorType = NOT_VALID_SENSOR_DATA;
+  ulong sysTimeStamp;
+  float *floatData;
+  uint numData;
+};
+
+enum FlightEventTypes{
+  LAUNCH_DETECTED, BOOST_END_DETECTED, APOGEE_DETECTED, DROGUE_CHUTE_DEPLOYMENT,
+  MAIN_CHUTE_DEPLOYMENT, LANDING_DETECTED, FLIGHT_RECORDER_END, SENSOR_OVERLOAD,
+  UNEXPECTED_EVENT, AIR_BRAKES_DEPLOYED, AIR_BRAKES_RETRACTED, NOT_VALID_EVENT
+};
+
+struct FlightEvent{
+  FlightEventTypes type = NOT_VALID_EVENT;
+  ulong sysTimeStamp;
+  float *data;
+  uint numData;
 };
