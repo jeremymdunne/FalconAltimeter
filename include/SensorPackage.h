@@ -1,20 +1,15 @@
 #ifndef _SENSOR_PACKAGE_H_
 #define _SENSOR_PACKAGE_H_
 #include <BMP280.h>
-#include <DataConfig.h>
+#include "DataConfig.h"
 //flags for sensors, used in return flags and sensor type flags
-#define SENSOR_PACKAGE_GYRO_FLAG        0b00000001
-#define SENSOR_PACKAGE_ACCEL_FLAG       0b00000010
-#define SENSOR_PACKAGE_MAG_FLAG         0b00000100
-#define SENSOR_PACKAGE_PRESSURE_FLAG    0b00001000
-#define SENSOR_PACKAGE_GPS_FLAG         0b00010000
-#define SENSOR_PACKAGE_TEMPERATURE_FLAG 0b00100000
+
 
 // update rates in hertz for major sensors
-#define SENSOR_PACKAGE_IMU_UPDATE_RATE 400
-#define SENSOR_PACKAGE_PRESSURE_UPDATE_RATE 60
-#define SENSOR_PACKAGE_GPS_UPDATE_RATE 1
-#define SENSOR_PACKAGE_WANTED_UPDATE_RATE 400
+#define SENSOR_PACKAGE_IMU_UPDATE_FREQUENCY 400
+#define SENSOR_PACKAGE_PRESSURE_UPDATE_FREQUENCY 60
+#define SENSOR_PACKAGE_GPS_UPDATE_FREQUENCY 1
+#define SENSOR_PACKAGE_WANTED_UPDATE_FREQUENCY 400
 
 
 //sensor dependent flags
@@ -33,7 +28,7 @@ public:
   //returns if a sensor is working, usefull for gps and other dependent sensors
   int getSensorStatus(int sensorFlag);
   //gets the sensor data in the form of
-  int getSensorData(int sensorFlag, SensorData *target);
+  int getSensorData(int sensorFlag, RocketData *target);
   //disables a certain sensor, removes it from the update queue
   int disableSensor(int sensorFlag);
   //enables a certain sensor

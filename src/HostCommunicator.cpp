@@ -1,20 +1,20 @@
 #include <HostCommunicator.h>
 
 
-int ComputerCommunication::requestResend(){
+int HostCommunicator::requestResend(){
   temp = FAILURE;
   handleSend(&temp, ERROR);
   return 0;
 }
 
-int ComputerCommunication::readLine(String *msg){
+int HostCommunicator::readLine(String *msg){
   if(recievedMessagesIndex == 0) return -1;
   *msg = recievedMessages[recievedMessagesIndex-1];
   recievedMessagesIndex --;
   return 0;
 }
 
-int ComputerCommunication::available(){
+int HostCommunicator::available(){
   //go and see if any are available
   if(computerBuffer.available() > 0){
     //go and grab it
@@ -57,7 +57,7 @@ int ComputerCommunication::available(){
   return recievedMessagesIndex;
 }
 
-int ComputerCommunication::parseCheckSumFromMessage(String *msg, bool modifyString){
+int HostCommunicator::parseCheckSumFromMessage(String *msg, bool modifyString){
   int sum = -1;
   if(msg->indexOf("*") >= 0){
     int start = msg->indexOf("*") + 1;
@@ -69,7 +69,7 @@ int ComputerCommunication::parseCheckSumFromMessage(String *msg, bool modifyStri
 }
 
 
-int ComputerCommunication::computeChecksum(String message){
+int HostCommunicator::computeChecksum(String message){
   int check = 0;
   for(uint i = 0; i < message.length(); i ++){
     check = check ^ message.charAt(i);
@@ -78,7 +78,7 @@ int ComputerCommunication::computeChecksum(String message){
 }
 
 
-int ComputerCommunication::sendData(String *msg, Communication_Type type){
+int HostCommunicator::sendData(String *msg, Communication_Type type){
   //encode in a standard start char, checkSum, endChar
   switch(type){
     case(VERBOSE):
@@ -94,7 +94,7 @@ int ComputerCommunication::sendData(String *msg, Communication_Type type){
   }
   return handleSend(&temp, type);
 }
-int ComputerCommunication::handleSend(String *msg, Communication_Type type){
+int HostCommunicator::handleSend(String *msg, Communication_Type type){
   //make sure there's a newline char
   if(msg->charAt(msg->length()-1) != '\n') *msg += '\n';
   //clear the buffer
@@ -123,6 +123,6 @@ int ComputerCommunication::handleSend(String *msg, Communication_Type type){
   return -1;
 }
 
-int ComputerCommunication::init(){
+int HostCommunicator::init(){
   return 0;
 }

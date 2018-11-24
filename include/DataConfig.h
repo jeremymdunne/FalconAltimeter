@@ -1,14 +1,5 @@
-#define ALTITUDE_SCALE_FACTOR 550  //~2^24/(30480)
-#define TIME_SCALE_FACTOR 1000
-#define ACCELERATION_SCALE_FACTOR 300 //~2^16/(20*9.81)
-#define VELOCITY_SCALE_FACTOR 90  //~2^16/(343*2)
-#define ORIENTATION_SCALE_FACTOR
-
-#define RAW_FLIGHT_DATA_DATA_DESCRIPTOR 1
-#define RAW_FLIGHT_DATA_SIZE 9
-#define FLIGHT_ESTIMATION_DATA_TAG 2
-#define GPS_DATA_TAG 3
-
+#ifndef _DATA_CONFIG_H_
+#define _DATA_CONFIG_H_
 
 #define SEND_FILE "SF"
 #define SEND_FAT_TABLE "ST"
@@ -17,15 +8,7 @@
 #define SEND_CONFIGURATION "SC"
 #define SEND_ERROR "ERR:"
 
-#define ACKNOWLEDGE "ACK"
-#define FAILURE "FAIL"
 
-#define START_STATEMENT_CHAR "$"
-#define START_VERBOSE_CHAR "#"
-#define HOST_START_CHAR "@"
-#define NUMBER_OF_ATTEMPTS 5
-#define COMPUTER_COMMUNICATION_TIMEOUT 5000
-#define COMMS_FAILURE -57
 
 
 //these are flags that can be commented out as needed
@@ -77,59 +60,78 @@ enum FLIGHT_PHASES{
 
 #include <Arduino.h>
 
-struct Raw_Flight_Data{
-  ulong timeStamp;
-  float pressureAlt;
-  float linearAcceleration;
-};
 
-struct Rocket_Attitude_Estimations{
-  ulong timeStamp;
-  float xOrientation;
-  float yOrientation;
-  float zOrientation;
-};
+//Storage methods
+/*
+All data is to be stored in binary format, ideally broken up into bytes
+When storing data in the storage, a tag is used to define the data type and length, and all intertwined data dataMembers
+The format is as follows in parsedcode
 
-struct Flight_Estimations{
-  ulong timeStamp;
-  float estimatedVelocity;
-  float estimatedApogee;
-};
+<tag>(1Byte),<TimeStamp>(3 bytes),<Data1>(Nbytes),<Data2>(XBytes)....
 
-struct GPS_data{
-  ulong timeStamp;
-  String latitude;
-  String longitude;
-  ulong altitude;
-  ulong gpsTime;
-};
+When reading the data, the tag is used in order to determine where and how to break up the data
+as well as the meaning of all the data.
 
-struct Event_Data{
+*/
+
+
+//all data members share these parameters
+#define FLIGHT_RECORDER_TIME_STAMP_BYTE_SIZE 3
+#define FLIGHT_RECORDER_TIME_STAMP_SCALE_FACTOR 1
+#define FLIGHT_RECORDER_TAG_BYTE_SIZE 1
+#define FLIGHT_RECORDER_TAG_SCALE_FACTOR 1
+
+//event/data specific definitions
+#define FLIGHT_RECORDER_ACCEL_DATA_BYTE_SIZE_PER_AXIS 3
+#define FLIGHT_RECORDER_ACCEL_DATA_SCALE_FACTOR       300
+#define FLIGHT_RECORDER_ACCEL_DATA_RECORDING_HERTZ    20
+
+#define FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS 3
+#define FLIGHT_RECORDER_GYRO_DATA_SCALE_FACTOR       1
+#define FLIGHT_RECORDER_GYRO_DATA_RECORDING_HERTZ    10
+
+#define FLIGHT_RECORDER_MAG_DATA_BYTE_SIZE_PER_AXIS 3
+#define FLIGHT_RECORDER_MAG_DATA_SCALE_FACTOR       1
+#define FLIGHT_RECORDER_MAG_DATA_RECORDING_HERTZ    10
+
+#define FLIGHT_RECORDER_GPS_DATA_BYTE_SIZE_PER_AXIS 3
+#define FLIGHT_RECORDER_GPS_DATA_SCALE_FACTOR       1
+#define FLIGHT_RECORDER_GPS_DATA_RECORDING_HERTZ  1
+
+#define FLIGHT_RECORDER_PRESSURE_ALTITUDE_BYTE_SIZE 3
+#define FLIGHT_RECORDER_PRESSURE_ALTITUDE_SCALE_FACTOR 550
+#define FLIGHT_RECORDER_PRESSURE_ALTITUDE_DATA_RECORDING_HERTZ    5
+
+#define FLIGHT_ACCEL_DATA_TAG                         1
+#define FLIGHT_GYRO_DATA_TAG                          2
+#define FLIGHT_MAG_DATA_TAG                           3
+#define FLIGHT_PRESSURE_ALTITUDE_DATA_TAG             4
+#define FLIGHT_GPS_DATA_TAG                           5
+#define FLIGHT_ESTIMATION_DATA_TAG                    6
+
+//tags 32-256 are dedicated to event tags
+//general flight tags
+#define FLIGHT_LAUNCH_DETECTION_EVENT_TAG             32
+#define FLIGHT_COAST_DETECTION_EVENT_TAG              33
+#define FLIGHT_APOGEE_DETECTION_EVENT_TAG             34
+#define FLIGHT_MAIN_PARACHUTE_DEPLOYED_EVENT_TAG      35
+#define FLIGHT_DROGUE_PARACHUTE_DEPLOYED_EVENT_TAG    36
+#define FLIGHT_LANDING_DETECTION_EVENT_TAG            37
+
+//modular specifics
+#define FLIGHT_AIR_BRAKE_DEPLOYMENT_EVENT_TAG         60
+#define FLIGHT_AIR_BRAKE_RETRACTED_EVENT_TAG          61
+
+struct RocketData{
+  uint8 tag;
   ulong timeStamp;
-  int dataMembers;
   float *data;
 };
 
-enum SensorType{
-  SENSOR_GPS, SENSOR_ACCEL, SENSOR_MAG, SENSOR_GYRO, SENSOR_PRESSURE_ALT, NOT_VALID_SENSOR_DATA
+struct GeneralEncodingStructure{
+  uint8 tag;
+  ulong timeStamp;
+
 };
 
-struct SensorData{
-  SensorType sensorType = NOT_VALID_SENSOR_DATA;
-  ulong sysTimeStamp;
-  float *floatData;
-  uint numData;
-};
-
-enum FlightEventTypes{
-  LAUNCH_DETECTED, BOOST_END_DETECTED, APOGEE_DETECTED, DROGUE_CHUTE_DEPLOYMENT,
-  MAIN_CHUTE_DEPLOYMENT, LANDING_DETECTED, FLIGHT_RECORDER_END, SENSOR_OVERLOAD,
-  UNEXPECTED_EVENT, AIR_BRAKES_DEPLOYED, AIR_BRAKES_RETRACTED, NOT_VALID_EVENT
-};
-
-struct FlightEvent{
-  FlightEventTypes type = NOT_VALID_EVENT;
-  ulong sysTimeStamp;
-  float *data;
-  uint numData;
-};
+#endif

@@ -1,28 +1,25 @@
 #include <Arduino.h>
+#include <DataConfig.h>
 #include <FLASH_FAT.h>
 #include <BMP280.h>
 #include <SerialBuffer.h>
-#include <DataConfig.h>
 #include <CircularBufferIndexer.h>
 
 #include <StorageController.h>
 #include <HostCommunicator.h>
 #include <SensorPackage.h>
+#include <FlightRecorder.h>
 
 //#include <MPU9250_IMU.h>
 
-CircularBufferIndexer indexer;
-FLASH_FAT fileSystem;
-FILE_ALLOCATION_TABLE_STRUCTURE fileStructure;
-BMP280 pressureSensor;
 //MPU9250_IMU imu;
 
 StorageController storageController;
 HostCommunicator hostCommunicator;
 SensorPackage sensorPackage;
-
+FlightRecorder flightRecorder;
 int status = 0;
-Raw_Flight_Data buffferedFlightData;
+
 
 
 /*
@@ -50,93 +47,9 @@ class FlightController{
 
 
 //example: SF:0 //send file 0
-
-//funciton prototypes
-//Serial and File communications
-int reportOpenedFileContents();
-int encodeRawFlightDataForDataStorage(byte *target, ulong timeStamp, float pressureAlt, float acceleration);
-int encodeRawFlightDataForDataStorage(byte *target, Raw_Flight_Data *data);
-int decodeRawFlightDataFromDataStorage(byte *toDecode, Raw_Flight_Data *target);
-int decodeFlightEstimations(byte *toDecode, Flight_Estimations *target);
-int encodeFlightEstimations(byte *target, ulong timeStamp, float estimatedVelocity, float estimatedApogee);
-int encodeFlightEstimations(byte *target, Flight_Estimations *data);
-int encodeGpsData(byte *target, ulong timeStamp, String latitude, String longitude);
-int encodeGpsData(byte *target, GPS_data *data);
-int computeChecksum(String message);
-int handleComputerSend(String *message, bool requestAck = true);
-void sendErrorToComputer(String message);
-int handleFileSendRequest(String message);
-String encodeRawFlightDataForComputer(Raw_Flight_Data *target);
-int reportOpenedFileContents();
-void updateFileStructure();
-void handleFatRequest(String message);
-int initFileSystem();
-
 //flight time communications
 
-int encodeRawFlightDataForDataStorage(byte *target, ulong timeStamp, float pressureAlt, float acceleration){
-  //first, scale the data
-  ulong scaledAlt = (ulong)(fabs(pressureAlt)*ALTITUDE_SCALE_FACTOR + .5);
-  ulong scaledAccel = (ulong)(fabs(acceleration)*ACCELERATION_SCALE_FACTOR + .5);
-  target[0] = RAW_FLIGHT_DATA_DATA_DESCRIPTOR;
-  target[1] = (timeStamp >> 16) & 0xFF;
-  target[2] = (timeStamp >> 8) & 0xFF;
-  target[3] = (timeStamp >> 0) & 0xFF;
-  target[4] = (scaledAlt >> 16) & 0xFF;
-  target[5] = (scaledAlt >> 8) & 0xFF;
-  target[6] = (scaledAlt >> 0) & 0xFF;
-  target[7] = (scaledAccel >> 8) & 0xFF;
-  target[8] = (scaledAccel >> 0) & 0xFF;
-  return 0;
-}
-
-int encodeRawFlightDataForDataStorage(byte *target, Raw_Flight_Data *data){
-  return encodeRawFlightDataForDataStorage(target, data->timeStamp, data->pressureAlt, data->acceleration);
-}
-
-int decodeRawFlightDataFromDataStorage(byte *toDecode, Raw_Flight_Data *target){
-  target->timeStamp = (ulong)(toDecode[1] << 16) | (toDecode[2] << 8) | (toDecode[3]);
-  target->pressureAlt = (float)((toDecode[4] << 16) | (toDecode[5] << 8) | (toDecode[6]))/ALTITUDE_SCALE_FACTOR;
-  target->acceleration = (float)((toDecode[7] << 8) | (toDecode[8]))/ACCELERATION_SCALE_FACTOR;
-  return 0;
-}
-
-int decodeFlightEstimations(byte *toDecode, Flight_Estimations *target){
-  target->timeStamp = (ulong)(toDecode[1] << 16) | (toDecode[2] << 8) | (toDecode[3]);
-  target->estimatedApogee = (float)(((toDecode[4] << 16) | (toDecode[5] << 8) | (toDecode[6]))/ALTITUDE_SCALE_FACTOR);
-  target->estimatedVelocity = (float)(((toDecode[7] << 8) | (toDecode[8]))/VELOCITY_SCALE_FACTOR);
-  return 0;
-}
-
-int encodeFlightEstimations(byte *target, ulong timeStamp, float estimatedVelocity, float estimatedApogee){
-  ulong scaledVelocity = (ulong)(fabs(estimatedVelocity)*VELOCITY_SCALE_FACTOR + .5);
-  ulong scaledApogee = (ulong)(fabs(estimatedApogee)*ALTITUDE_SCALE_FACTOR + .5);
-  target[0] = FLIGHT_ESTIMATION_DATA_TAG;
-  target[1] = (scaledApogee >> 16) & 0xFF;
-  target[2] = (scaledApogee >> 8) & 0xFF;
-  target[3] = (scaledApogee >> 0) & 0xFF;
-  target[4] = (scaledVelocity >> 16) & 0xFF;
-  target[4] = (scaledVelocity >> 8) & 0xFF;
-  target[4] = (scaledVelocity >> 0) & 0xFF;
-  return 0;
-}
-
-int encodeFlightEstimations(byte *target, Flight_Estimations *data){
-  return encodeFlightEstimations(target, data->timeStamp, data->estimatedVelocity, data->estimatedApogee);
-}
-
-int encodeGpsData(byte *target, ulong timeStamp, String latitude, String longitude){
-  //
-  return 0;
-}
-
-int encodeGpsData(byte *target, GPS_data *data){
-  return encodeGpsData(target, data->timeStamp, data->latitude, data->longitude);
-}
-
-
-
-
+/*
 void sendErrorToComputer(String message){
   //encode it
   message = SEND_ERROR+message;
@@ -171,10 +84,6 @@ int handleFileSendRequest(String message){
   status = reportOpenedFileContents();
 }
 
-String encodeRawFlightDataForComputer(Raw_Flight_Data *target){
-  //go encode in a standard
-  return String(RAW_FLIGHT_DATA_DATA_DESCRIPTOR) + ":" + String(target->timeStamp) + "," + String(target->pressureAlt) + "," + String(target->acceleration);
-}
 
 int reportOpenedFileContents(){
   //go grab space for the maximum message size ~32 bytes
@@ -189,11 +98,11 @@ int reportOpenedFileContents(){
         //Serial.println("RAW FLIGHT DATA");
         //grab the remaining length
         status = fileSystem.readStream(&primary[1],RAW_FLIGHT_DATA_SIZE-1);
-        /*
+
         for(int i = 0; i < RAW_FLIGHT_DATA_SIZE; i ++){
           Serial.print(String(primary[i]) + "\t");
         }
-        */
+
         status = decodeRawFlightDataFromDataStorage(&primary[0], &buffferedFlightData);
         computerMessage = encodeRawFlightDataForComputer(&buffferedFlightData);
         status = handleComputerSend(&computerMessage);
@@ -218,9 +127,9 @@ void updateFileStructure(){
 void handleFatRequest(String message){
   //send over the fat table
   //send each index and length.
-  /*
+
   index,size;index,size;index,size
-  */
+
   updateFileStructure();
   String totalMessage;
   for(int i = 0; i < fileStructure.numberOfFiles; i ++){
@@ -287,7 +196,7 @@ int initFileSystem(){
   return 0;
 }
 
-/*
+
   recordFlight
   main function for flight routines
   records all available data and controls data storage
@@ -297,11 +206,11 @@ int initFileSystem(){
   the waitForLaunch uses a circular buffer of ~5 seconds
 */
 
-Raw_Flight_Data flightDataPreLaunchBuffer[PRE_LAUNCH_RAW_FLIGHT_BUFFER_SIZE];
-GPS_data gpsDataPreLaunchBuffer[PRE_LAUNCH_GPS_BUFFER_SIZE];
+//Raw_Flight_Data flightDataPreLaunchBuffer[PRE_LAUNCH_RAW_FLIGHT_BUFFER_SIZE];
+//GPS_data gpsDataPreLaunchBuffer[PRE_LAUNCH_GPS_BUFFER_SIZE];
 
-CircularBufferIndexer flightDataPreLaunchBufferIndexer;
-CircularBufferIndexer gpsDataPreLaunchBufferIndexer;
+//CircularBufferIndexer flightDataPreLaunchBufferIndexer;
+//CircularBufferIndexer gpsDataPreLaunchBufferIndexer;
 
 
 bool serialInterrupt = false;
@@ -371,6 +280,7 @@ void recordFlight(){
 
 }
 */
+/*
 void makeDummyFile(){
   fileSystem.openToWrite();
   byte buffer[256];
@@ -395,25 +305,54 @@ void makeDummyFlightFile(){
   fileSystem.close();
 }
 
-
+*/
 void setup() {
   Serial.begin(115200);
   delay(2000);
+  flightRecorder.init();
   //testCircularBuffer();
   //while(true);
   Serial.println("Beginning!");
   String message;
-  ComputerCommunication coms;
-  coms.init();
+  //ComputerCommunication coms;
+  //coms.init();
   String msg;
+  //make up a couple of sensor packages
+  RocketData dummyAccel, dummyGyro, dummyMag;
+  dummyAccel.tag = FLIGHT_ACCEL_DATA_TAG;
+  dummyAccel.timeStamp = 100;
+  dummyAccel.data = new float[3]{10,20,40};
+  dummyGyro.tag = FLIGHT_GYRO_DATA_TAG;
+  dummyGyro.timeStamp = 120;
+  dummyGyro.data = new float[3]{100,200,400};
+  ulong startTime = micros();
+  flightRecorder.update(dummyAccel);
+  ulong endTime = micros();
+  Serial.println("Elapsed: " + String(endTime - startTime));
+  flightRecorder.update(dummyGyro);
+  delay(1000);
+  int status = flightRecorder.update(dummyGyro);
+  Serial.println("FlightRecorder status: " + String(status));
+  byte tempBuffer[256];
+  startTime = micros();
+  int size = flightRecorder.getRequestedBufferToStore(&tempBuffer[0], 256);
+  endTime = micros();
+  Serial.println("Elapsed: " + String(endTime - startTime));
+  for(int i = 0; i < size; i ++){
+    if(i%16 == 0) Serial.println();
+    Serial.print(String(tempBuffer[i]) + "\t");
+  }
+  Serial.println("Done");
+  while(true);
+  /*
   while(true){
     if(coms.available()){
       coms.readLine(&msg);
       Serial.println("RECEIVED: " + msg);
     }
   }
-  initFileSystem();
-  makeDummyFlightFile();
+  //initFileSystem();
+  //makeDummyFlightFile();
   //fileSystem.makeFileAllocationTable();
   /*
   while(true){
