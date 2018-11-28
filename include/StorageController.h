@@ -24,6 +24,8 @@ public:
   int write(byte *buf, int n);
   int read(byte *buf, int n);
   int close();
+  uint getNumberOfFiles();
+  int update(){return 0;}
 private:
   FLASH_FAT fatSystem;
   FILE_ALLOCATION_TABLE_STRUCTURE tempFileStructure;

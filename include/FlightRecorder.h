@@ -27,9 +27,9 @@ public:
   int init();
   //returns any requests on data writing
   int update(RocketData newData);
+
   //returns up to FLIGHT_RECORDER_MAX_RETURN_BUFFER_SIZE buffer to be written
   int encodeData(RocketData data);
-  int getRequestedStorageBuffer(byte *buf, uint n);
   int scaleAndEncodeData(float data, uint numBytesToFill, int scale, byte*toFille);
   int getNumberRequestedMessages();
   int getRequestedBufferToStore(byte *buffer, uint maxSize);
@@ -46,6 +46,7 @@ private:
   int encodedDataStartReadIndex = 0;
   int encodedDataWriteIndex = 0;
   uint8 tempSize = 0;
+  int determineEncodingByteSize(int dataFlag);
   int determineEncodingByteSize(RocketData *data);
   int encodeRocketData(RocketData *data, byte *target);
   int checkSchedulersForUpdates();

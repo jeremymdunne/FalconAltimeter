@@ -35,8 +35,12 @@ int FlightRecorder::init(){
 }
 
 int FlightRecorder::determineEncodingByteSize(RocketData *data){
+  return determineEncodingByteSize(data->tag);
+}
+
+int FlightRecorder::determineEncodingByteSize(int tag){
   uint base = FLIGHT_RECORDER_TIME_STAMP_BYTE_SIZE + FLIGHT_RECORDER_TAG_BYTE_SIZE;
-  switch(data->tag){
+  switch(tag){
     case(FLIGHT_GYRO_DATA_TAG):
       base += 3 * FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS;
       break;

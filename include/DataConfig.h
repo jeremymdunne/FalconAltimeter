@@ -8,7 +8,11 @@
 #define SEND_CONFIGURATION "SC"
 #define SEND_ERROR "ERR:"
 
+//#define STORE_DATA
 
+//#define MEASURE_IMU
+#define MEASURE_PRESSURE
+//#define MEASURE_GPS
 
 
 //these are flags that can be commented out as needed
@@ -125,7 +129,8 @@ as well as the meaning of all the data.
 struct RocketData{
   uint8 tag;
   ulong timeStamp;
-  float *data;
+  float *data; //preserve memory if possible, write over this if needed
+  uint8 numMembers = 2; //should reflect the number of members in data[]
 };
 
 struct GeneralEncodingStructure{
