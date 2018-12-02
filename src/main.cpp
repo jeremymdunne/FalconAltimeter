@@ -1,10 +1,9 @@
 #include <Arduino.h>
 #include <DataConfig.h>
-#include <FLASH_FAT.h>
+#include <FlashFAT.h>
 #include <SerialBuffer.h>
 #include <CircularBufferIndexer.h>
 
-#include <StorageController.h>
 #include <HostCommunicator.h>
 #include <SensorPackage.h>
 #include <FlightRecorder.h>
@@ -15,7 +14,7 @@
 
 
 
-StorageController storageController;
+FlashFAT storageController;
 HostCommunicator hostCommunicator;
 SensorPackage sensorPackage;
 FlightRecorder flightRecorder;
@@ -37,7 +36,7 @@ File Send testing
 */
 
 
-
+int sendDataFile(uint fileIndex);
 
 
 
@@ -101,6 +100,43 @@ void checkPhaseChange(){
       break;
   }
 }
+String hostMessage;
+int sendFileAllocationTable(){
+  //go read the fat table
+  FlashFAT::FileAllocationTable tempFATTable;
+  storageController.getFileAllocationTable(&tempFATTable);
+  //create the message
+  hostMessage = "" + String(tempFATTable.numFiles) + ";";
+  for(uint i = 0; i < tempFATTable.numFiles; i ++){
+    if(i != 0) hostMessage += ";";
+    hostMessage += String(i) + ":" + String(tempFATTable.files[i].size) + "," + String(tempFATTable.files[i].startAddress);
+  }
+  hostCommunicator.sendData(&hostMessage, HostCommunicator::VERBOSE);
+  return 0;
+}
+
+
+#define REQUEST_FAT_TABLE 30
+#define REQUEST_FILE_SEND 31
+
+int handleComputerCommunication(){
+  while(hostCommunicator.available()>0){
+    hostCommunicator.readLine(&hostMessage);
+    Serial.println("Recieved Message: " + hostMessage);
+    if(hostMessage.indexOf(SEND_FAT_TABLE) >= 0){
+      return REQUEST_FAT_TABLE;
+    }
+    if(hostMessage.indexOf(SEND_FILE) >= 0){
+      Serial.println("Sending over file: ");
+      int index = hostMessage.indexOf(':');
+      int fileIndex = atoi(hostMessage.substring(index+1).c_str());
+      Serial.println("Index: " + String(fileIndex));
+      return sendDataFile(fileIndex);
+    }
+  }
+  return 0;
+}
+
 /*
   sendDataFile
   handles sending a file by communicating between the storageController and hostCommunicator
@@ -108,16 +144,21 @@ void checkPhaseChange(){
 */
 int sendDataFile(uint fileIndex){
   //double check the fileIndex
-  status = storageController.openToRead(fileIndex);
-  if(status < 0) return -1;
-  byte buff[32];
-  status = storageController.read(&buff[0],1);
-  while(status > 0){
-    switch(status){
-      case(1):
-      break;
-    }
+  status = storageController.open(FlashFAT::READ,fileIndex);
+  if(status != 0){
+    Serial.println("No such file!" + String(status));
+    return -1;
   }
+  byte readBuff[512];
+  while(storageController.peek() > 0){
+      int length = storageController.read(&readBuff[0],128);
+      for(int i = 0; i < length; i ++){
+        if(i%16 == 0)Serial.println();
+        Serial.print(String(readBuff[i]) + "\t");
+      }
+  }
+
+
 }
 
 /*
@@ -172,7 +213,13 @@ int handleStorageRequest(){
         }
       #endif
       #ifdef STORE_DATA
-        storageController.write(&flightRecorderStorageBuffer[0], flightRecorderStorageIndex);
+        for(int i = 0; i < flightRecorderStorageIndex; i ++){
+          if(i%16 == 0) Serial.println();
+          Serial.print(String(flightRecorderStorageBuffer[i]) + "\t");
+        }
+        status = storageController.write(&flightRecorderStorageBuffer[0], flightRecorderStorageIndex);
+        Serial.println("Storage Status: " +String(status));
+
       #endif
     }
     else{
@@ -194,10 +241,46 @@ int updateSystems(){
    //handle recording request
    handleStorageRequest();
  }
+ status = handleComputerCommunication();
+ switch(status){
+  case(REQUEST_FAT_TABLE):
+    sendFileAllocationTable();
+    break;
+  case(REQUEST_FILE_SEND):
+    break;
+ }
  masterTempStorageMembers = 0;
  return 0;
 }
 
+void flight(){
+  int openStatus = storageController.open(FlashFAT::WRITE);
+  Serial.println("Open Status: " + String(openStatus));
+  long startMillis = millis();
+  Serial.println("Running for 5 seconds to create dummy file");
+  while(millis() - startMillis < 5000){
+    updateSystems();
+  }
+  storageController.close();
+  Serial.println("Done!");
+  while(true);
+}
+
+void wipeStorage(){
+  Serial.println("Wiping storage, kill power to stop!");
+  delay(10000);
+  Serial.println("Wiping, please wait");
+  storageController.eraseAllFiles();
+  Serial.println("Done!");
+}
+
+void wipeLastFile(){
+  Serial.println("Wiping last file!");
+  delay(5000);
+  storageController.eraseLastFile();
+  delay(2000);
+  Serial.println("Done!");
+}
 
 void setup() {
   Serial.begin(115200);
@@ -205,6 +288,8 @@ void setup() {
   flightRecorder.init();
   storageController.init();
   status = sensorPackage.init();
+  //wipeStorage();
+  //wipeLastFile();
   Serial.println("Sensor Package init: " + String(status));
   //testCircularBuffer();
   //while(true);
@@ -216,6 +301,7 @@ void setup() {
   //make up a couple of sensor packages
   RocketData sensorData[5];
   //sensorData[0].data = new float[3]{};
+  //flight();
   while(true){
     updateSystems();
   }

@@ -19,7 +19,7 @@ int FlightRecorder::getRequestedBufferToStore(byte *buffer, uint maxSize){
     copyBuffer(buffer, encodedData[encodedDataStartReadIndex], encodedDataSize[encodedDataStartReadIndex], tempSize);
     tempSize += encodedDataSize[encodedDataStartReadIndex];
     encodedDataStartReadIndex ++;
-    if(encodedDataStartReadIndex > FLIGHT_RECORDER_CIRCULAR_BUFFER_ROWS) encodedDataStartReadIndex = 0;
+    if(encodedDataStartReadIndex >= FLIGHT_RECORDER_CIRCULAR_BUFFER_ROWS) encodedDataStartReadIndex = 0;
     entriesRecorded ++;
   }
   return tempSize;
@@ -127,12 +127,14 @@ int FlightRecorder::addUpdateToBuffer(RocketData *toUpdate){
   //check the byte buffer
   //Serial.println(toUpdate->data[0]);
   if(toUpdate->data != NULL){
+    //Serial.println("\n\nUpdate millis: " + String(toUpdate->timeStamp));
+    //Serial.println("Tag: " + String(toUpdate->tag));
     encodedDataSize[encodedDataWriteIndex] = encodeRocketData(toUpdate, &encodedData[encodedDataWriteIndex][0]);
     //Serial.println("Size of encode:" + String(encodedDataSize[encodedDataWriteIndex]));
     encodedDataWriteIndex ++;
     //Serial.println("Write Index: " + String(encodedDataWriteIndex));
     if(encodedDataWriteIndex >= FLIGHT_RECORDER_CIRCULAR_BUFFER_ROWS) encodedDataWriteIndex = 0;
-    //Serial.println("Write Index: " + String(encodedDataWriteIndex));
+    //Serial.println("Write Index: " + String(encodedDataWriteIndex) + "\n\n");
     return 0;
   }
   return -1;

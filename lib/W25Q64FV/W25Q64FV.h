@@ -29,6 +29,7 @@ class W25Q64FV{
 public:
   int init(int ssPin, bool initSPI=true);
   int write256(ulong address, byte *buff);
+  int write(ulong address, byte *buff, uint length);
   int eraseSector(ulong address);
   int eraseBlock32(ulong address);
   int eraseBlock64(ulong address);

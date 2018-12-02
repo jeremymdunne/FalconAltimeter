@@ -96,7 +96,10 @@ int W25Q64FV::checkWriteEnable(){
 }
 
 int W25Q64FV::write256(ulong address, byte *buff){
-  //Serial.println("Writing ADDR: " + String(address));
+  return write(address,buff,256);
+}
+
+int W25Q64FV::write(ulong address, byte *buff, uint length){
   if(isBusy()) return FLASH_BUSY;
   writeEnable();
   select();
@@ -107,7 +110,7 @@ int W25Q64FV::write256(ulong address, byte *buff){
   SPI.transfer((address >> 8) & 0xFF);
   SPI.transfer((address >> 0) & 0xFF);
   //send the data
-  for (int i = 0; i < 256; i++) {
+  for (uint i = 0; i < length; i++) {
     SPI.transfer(buff[i]);
   }
   SPI.endTransaction();

@@ -33,6 +33,8 @@ public:
   int scaleAndEncodeData(float data, uint numBytesToFill, int scale, byte*toFille);
   int getNumberRequestedMessages();
   int getRequestedBufferToStore(byte *buffer, uint maxSize);
+  int determineEncodingByteSize(int dataFlag);
+  int determineEncodingByteSize(RocketData *data);
 private:
   ulong lastRawDataWriteTime = 0;
   ulong lastGPSDataWriteTime = 0;
@@ -46,8 +48,7 @@ private:
   int encodedDataStartReadIndex = 0;
   int encodedDataWriteIndex = 0;
   uint8 tempSize = 0;
-  int determineEncodingByteSize(int dataFlag);
-  int determineEncodingByteSize(RocketData *data);
+
   int encodeRocketData(RocketData *data, byte *target);
   int checkSchedulersForUpdates();
   int addUpdateToBuffer(RocketData *toUpdate);

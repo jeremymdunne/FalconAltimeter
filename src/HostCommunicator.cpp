@@ -27,7 +27,7 @@ int HostCommunicator::available(){
       return recievedMessagesIndex;
     }
     temp = temp.substring(temp.indexOf(HOST_START_CHAR) + 1);
-    Serial.println("Recieved message ; " + temp);
+    //Serial.println("Recieved message ; " + temp);
     //if it has a checksum, check it
     int checkSum = -1;
     if(temp.indexOf("*") >= 0){
