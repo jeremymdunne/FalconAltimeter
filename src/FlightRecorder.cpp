@@ -54,7 +54,7 @@ int FlightRecorder::determineEncodingByteSize(int tag){
       base += 2 * FLIGHT_RECORDER_GPS_DATA_BYTE_SIZE_PER_AXIS;
       break;
     case(FLIGHT_PRESSURE_ALTITUDE_DATA_TAG):
-      base += 3 * FLIGHT_RECORDER_PRESSURE_ALTITUDE_BYTE_SIZE;
+      base += FLIGHT_RECORDER_PRESSURE_ALTITUDE_BYTE_SIZE;
       break;
     case(FLIGHT_LAUNCH_DETECTION_EVENT_TAG):
       break;
@@ -91,6 +91,61 @@ int FlightRecorder::scaleAndEncodeData(float data, uint numBytesToFill, int scal
   */
   return 0;
 };
+
+//combines the necessary bytes and scales
+float FlightRecorder::decodeAndScaleData(byte *buff, int byteLength, int scale){
+  long value = 0;
+
+  for(int i = 0; i < byteLength; i ++){
+    value += buff[i] << ((byteLength - i - 1)*8);
+    //Serial.println("Raw Value: " + String(buff[i]) + " shifted: " + String((byteLength - i - 1)*8));
+  }
+  //Serial.println("Combined value:" + String(value));
+  return (float)value/(float)scale;
+}
+
+int FlightRecorder::decodeBuffer(byte *buff, uint maxLength, RocketData *target){
+  target->tag = decodeAndScaleData(&buff[0], FLIGHT_RECORDER_TAG_BYTE_SIZE, FLIGHT_RECORDER_TAG_SCALE_FACTOR);
+  target->timeStamp = decodeAndScaleData(&buff[FLIGHT_RECORDER_TAG_BYTE_SIZE], FLIGHT_RECORDER_TIME_STAMP_BYTE_SIZE, FLIGHT_RECORDER_TIME_STAMP_SCALE_FACTOR);
+  if(target->tag < 0 || target->tag > 10){
+    //bad peice of data
+    return DECODE_NOT_VALID_TAG;
+  }
+  uint requiredLength = determineEncodingByteSize(target->tag);
+  //Serial.println("Length: " + String(requiredLength));
+  if(maxLength < requiredLength){
+    //uh oh, request more datas to complete
+    return DECODE_REQUEST_MODE_DATA;
+  }
+  int base = FLIGHT_RECORDER_TAG_BYTE_SIZE+FLIGHT_RECORDER_TIME_STAMP_BYTE_SIZE;
+
+  switch(buff[0]){
+    case(FLIGHT_ACCEL_DATA_TAG):
+      target->data[0] = decodeAndScaleData(&buff[base],FLIGHT_RECORDER_ACCEL_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_ACCEL_DATA_SCALE_FACTOR);
+      target->data[1] = decodeAndScaleData(&buff[base + FLIGHT_RECORDER_ACCEL_DATA_BYTE_SIZE_PER_AXIS],FLIGHT_RECORDER_ACCEL_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_ACCEL_DATA_SCALE_FACTOR);
+      target->data[2] = decodeAndScaleData(&buff[base + 2*FLIGHT_RECORDER_ACCEL_DATA_BYTE_SIZE_PER_AXIS],FLIGHT_RECORDER_ACCEL_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_ACCEL_DATA_SCALE_FACTOR);
+      break;
+    case(FLIGHT_GYRO_DATA_TAG):
+      target->data[0] = decodeAndScaleData(&buff[base],FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_GYRO_DATA_SCALE_FACTOR);
+      target->data[1] = decodeAndScaleData(&buff[base + FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS],FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_GYRO_DATA_SCALE_FACTOR);
+      target->data[2] = decodeAndScaleData(&buff[base + 2*FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS],FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_GYRO_DATA_SCALE_FACTOR);
+      break;
+    case(FLIGHT_MAG_DATA_TAG):
+      target->data[0] = decodeAndScaleData(&buff[base],FLIGHT_RECORDER_MAG_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_MAG_DATA_SCALE_FACTOR);
+      target->data[1] = decodeAndScaleData(&buff[base + FLIGHT_RECORDER_MAG_DATA_BYTE_SIZE_PER_AXIS],FLIGHT_RECORDER_MAG_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_MAG_DATA_SCALE_FACTOR);
+      target->data[2] = decodeAndScaleData(&buff[base + 2*FLIGHT_RECORDER_MAG_DATA_BYTE_SIZE_PER_AXIS],FLIGHT_RECORDER_MAG_DATA_BYTE_SIZE_PER_AXIS,FLIGHT_RECORDER_MAG_DATA_SCALE_FACTOR);
+      break;
+    case(FLIGHT_PRESSURE_ALTITUDE_DATA_TAG):
+      //Serial.println("Pressure tag detected!");
+      target->data[0] = decodeAndScaleData(&buff[base],FLIGHT_RECORDER_PRESSURE_ALTITUDE_BYTE_SIZE,FLIGHT_RECORDER_PRESSURE_ALTITUDE_SCALE_FACTOR);
+      //Serial.println("Done");
+      break;
+    default:
+      return -1;
+      break;
+  }
+  return requiredLength;
+}
 
 int FlightRecorder::encodeRocketData(RocketData *data, byte *target){
   tempSize = FLIGHT_RECORDER_TIME_STAMP_BYTE_SIZE + FLIGHT_RECORDER_TAG_BYTE_SIZE;

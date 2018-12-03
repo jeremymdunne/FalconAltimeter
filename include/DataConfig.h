@@ -108,8 +108,8 @@ as well as the meaning of all the data.
 
 #define FLIGHT_ACCEL_DATA_TAG                         1
 #define FLIGHT_GYRO_DATA_TAG                          2
-#define FLIGHT_MAG_DATA_TAG                           3
-#define FLIGHT_PRESSURE_ALTITUDE_DATA_TAG             4
+#define FLIGHT_MAG_DATA_TAG                           9
+#define FLIGHT_PRESSURE_ALTITUDE_DATA_TAG             3
 #define FLIGHT_GPS_DATA_TAG                           5
 #define FLIGHT_ESTIMATION_DATA_TAG                    6
 

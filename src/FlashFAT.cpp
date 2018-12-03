@@ -38,6 +38,23 @@ int FlashFAT::write(byte *buf, uint length){
     #endif
     return status;
   }
+  //the next problem to solve: if we exceed the 256 B page, then we'll need to move to the next page
+  uint spaceUntilEndOfPage = (((currentAddress >> 8) + 1) << 8) - currentAddress;
+  //Serial.println("Current Address: " + String(currentAddress));
+  //Serial.println("Space remaining in page: " + String(spaceUntilEndOfPage));
+  if(spaceUntilEndOfPage < length){
+    //Serial.println("Writing to jump pages");
+    status = flashStorage.write(currentAddress, buf, spaceUntilEndOfPage);
+    currentAddress += spaceUntilEndOfPage;
+    status = waitUntilFree();
+    if(status != 0){
+      #ifdef USE_SERIAL_OUTPUT
+        Serial.println("write timout error: " + String(status));
+      #endif
+      return status;
+    }
+    return write(&buf[spaceUntilEndOfPage],length-spaceUntilEndOfPage);
+  }
   status = flashStorage.write(currentAddress, buf, length);
   currentAddress += length;
   if(status != 0){
@@ -174,6 +191,7 @@ int FlashFAT::eraseNextPartOfWriteSector(){
     #endif
     return status;
   }
+  Serial.println("Erasing sector at: " + String(highestErasedAddress));
   flashStorage.eraseSector(highestErasedAddress);
   highestErasedAddress += 1<<12; //add 4kb to the address;
 }

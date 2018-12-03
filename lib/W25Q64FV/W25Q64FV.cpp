@@ -110,9 +110,12 @@ int W25Q64FV::write(ulong address, byte *buff, uint length){
   SPI.transfer((address >> 8) & 0xFF);
   SPI.transfer((address >> 0) & 0xFF);
   //send the data
+  delayMicroseconds(100);
   for (uint i = 0; i < length; i++) {
     SPI.transfer(buff[i]);
+    //Serial.print(buff[i]);
   }
+  Serial.println();
   SPI.endTransaction();
   release();
   return 0;

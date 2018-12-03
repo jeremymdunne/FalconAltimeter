@@ -11,6 +11,9 @@
 #define FLIGHT_RECORDER_CIRCULAR_BUFFER_ROWS          8
 #define FLIGHT_RECORDER_CIRCULAR_BUFFER_MAX_COLUMNS   32
 
+#define DECODE_NOT_VALID_TAG -2
+#define DECODE_REQUEST_MODE_DATA 1
+
 #include <Arduino.h>
 #include <DataConfig.h>
 #include <UpdateScheduler.h>
@@ -35,6 +38,8 @@ public:
   int getRequestedBufferToStore(byte *buffer, uint maxSize);
   int determineEncodingByteSize(int dataFlag);
   int determineEncodingByteSize(RocketData *data);
+  int decodeBuffer(byte *buff, uint maxLength, RocketData *target);
+  float decodeAndScaleData(byte *buff, int byteLength, int scale);
 private:
   ulong lastRawDataWriteTime = 0;
   ulong lastGPSDataWriteTime = 0;

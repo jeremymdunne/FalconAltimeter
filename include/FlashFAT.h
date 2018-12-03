@@ -62,8 +62,8 @@ private:
   FILE_MODE currentMode = STANDBY;
   W25Q64FV flashStorage;
   uint currentFD = 0;
-  ulong currentAddress = -1;
-  ulong highestErasedAddress = -1;
+  ulong currentAddress = 0;
+  ulong highestErasedAddress = 0;
   byte tempBuffer[256];
   int status;
 };

@@ -12,7 +12,23 @@
 
 //MPU9250_IMU imu;
 
+#ifdef __arm__
+// should use uinstd.h to define sbrk but Due causes a conflict
+extern "C" char* sbrk(int incr);
+#else  // __ARM__
+extern char *__brkval;
+#endif  // __arm__
 
+int freeMemory() {
+  char top;
+#ifdef __arm__
+  return &top - reinterpret_cast<char*>(sbrk(0));
+#elif defined(CORE_TEENSY) || (ARDUINO > 103 && ARDUINO != 151)
+  return &top - __brkval;
+#else  // __arm__
+  return __brkval ? &top - __brkval : &top - __malloc_heap_start;
+#endif  // __arm__
+}
 
 FlashFAT storageController;
 HostCommunicator hostCommunicator;
@@ -22,7 +38,7 @@ int status = 0;
 
 /*Todo list:
 //Sensor Package Testing
-Storage Controller Testing
+//Storage Controller Testing
 Host communicator finishing
 Intermediate information routing
 File Send testing
@@ -37,7 +53,7 @@ File Send testing
 
 
 int sendDataFile(uint fileIndex);
-
+int recoverFile(uint fileIndex);
 
 
 class FlightKinematics{
@@ -119,11 +135,19 @@ int sendFileAllocationTable(){
 #define REQUEST_FAT_TABLE 30
 #define REQUEST_FILE_SEND 31
 
+struct HostRequest{
+  int requestFlag;
+  int *data;
+  uint numMembers = 0;
+};
+HostRequest recentRequest;
 int handleComputerCommunication(){
   while(hostCommunicator.available()>0){
     hostCommunicator.readLine(&hostMessage);
     Serial.println("Recieved Message: " + hostMessage);
     if(hostMessage.indexOf(SEND_FAT_TABLE) >= 0){
+      recentRequest.requestFlag = REQUEST_FAT_TABLE;
+      recentRequest.numMembers = 0;
       return REQUEST_FAT_TABLE;
     }
     if(hostMessage.indexOf(SEND_FILE) >= 0){
@@ -137,11 +161,57 @@ int handleComputerCommunication(){
   return 0;
 }
 
+String dataString;
+String rocketDataToString(RocketData *data){
+  dataString = String(data->tag) + "," + String(data->timeStamp);
+  int numDataMembers = 0;
+  switch(data->tag){
+    case(FLIGHT_ACCEL_DATA_TAG):
+      numDataMembers = 3;
+      break;
+    case(FLIGHT_GYRO_DATA_TAG):
+      numDataMembers = 3;
+      break;
+    case(FLIGHT_MAG_DATA_TAG):
+      numDataMembers = 3;
+      break;
+    case(FLIGHT_PRESSURE_ALTITUDE_DATA_TAG):
+      numDataMembers = 1;
+      break;
+  }
+  for(int i = 0; i < numDataMembers; i ++){
+    dataString += "," + String(data->data[i]);
+  }
+  return dataString;
+}
+
 /*
   sendDataFile
   handles sending a file by communicating between the storageController and hostCommunicator
   send the data one member at a time
 */
+
+int recoverFile(uint fileIndex){
+  //double check the fileIndex
+  status = storageController.open(FlashFAT::READ,fileIndex);
+  if(status != 0){
+    Serial.println("No such file!" + String(status));
+    return -1;
+  }
+  ulong address;
+  FlashFAT::FileAllocationTable table;
+  storageController.getFileAllocationTable(&table);
+  address = table.files[fileIndex].startAddress;
+  Serial.println("Recovering from: " + String(address));
+  byte readBuff[1024];
+  storageController.recoveryRead(address, &readBuff[0], 1024);
+  for(int i = 0; i < 1024; i ++){
+    if(i%16 == 0) Serial.println();
+    Serial.print(String(readBuff[i]) + "\t");
+  }
+  Serial.println("\n\n");
+}
+
 int sendDataFile(uint fileIndex){
   //double check the fileIndex
   status = storageController.open(FlashFAT::READ,fileIndex);
@@ -150,12 +220,19 @@ int sendDataFile(uint fileIndex){
     return -1;
   }
   byte readBuff[512];
+  RocketData data;
+  data.data = new float[5];
+  //Serial.println("Peek Status: " + String(storageController.peek()));
   while(storageController.peek() > 0){
-      int length = storageController.read(&readBuff[0],128);
-      for(int i = 0; i < length; i ++){
-        if(i%16 == 0)Serial.println();
-        Serial.print(String(readBuff[i]) + "\t");
-      }
+      status = storageController.read(&readBuff[0],1);
+      int length = flightRecorder.determineEncodingByteSize(readBuff[0]);
+      //Serial.println("Length: " + String(length));
+      storageController.read(&readBuff[1],length-1);
+      status = flightRecorder.decodeBuffer(&readBuff[0], length, &data);
+      //Serial.println("Temp status " + String(status));
+      Serial.println(rocketDataToString(&data));
+      delay(1);
+
   }
 
 
@@ -213,13 +290,8 @@ int handleStorageRequest(){
         }
       #endif
       #ifdef STORE_DATA
-        for(int i = 0; i < flightRecorderStorageIndex; i ++){
-          if(i%16 == 0) Serial.println();
-          Serial.print(String(flightRecorderStorageBuffer[i]) + "\t");
-        }
         status = storageController.write(&flightRecorderStorageBuffer[0], flightRecorderStorageIndex);
-        Serial.println("Storage Status: " +String(status));
-
+        //Serial.println("Storage Status: " +String(status))
       #endif
     }
     else{
@@ -253,6 +325,115 @@ int updateSystems(){
  return 0;
 }
 
+/*
+The computer has requsted data files, so we are standing down from any launch events
+*/
+void handleDataRecoverMode(){
+  while(true){
+    status = handleComputerCommunication();
+    switch(status){
+     case(REQUEST_FAT_TABLE):
+       sendFileAllocationTable();
+       break;
+     case(REQUEST_FILE_SEND):
+       break;
+    }
+  }
+}
+
+struct PreFlightDataStorage{
+  byte *buf;
+  uint length;
+};
+
+PreFlightDataStorage preFlightCircularBuffer[128];
+bool preFlightCircularBufferFilledOnce = false;
+uint preFlightCircularBufferIndex = 0;
+
+void copyBuffer(byte *source, byte *target, uint length){
+  for(uint i = 0; i < length; i ++){
+    target[i] = source[i];
+  }
+}
+
+/*
+Controlls what to do for pre-launch purposes
+Also checks if the computer requests a data recovery mode and enters it appropriately
+*/
+void preFlightWait(){
+  Serial.println("Storage status: " + String(storageController.open(FlashFAT::WRITE)));
+  long startM = millis();
+  while(millis() - startM < 15000){
+    //update sensors
+    int numDataAvail = updateSensorPackage();
+    //update flightRecorder
+    if(numDataAvail > 0){
+      for(int i = 0; i < numDataAvail; i ++){
+        status = flightRecorder.update(masterTempStorage[i]);
+        //Serial.println("Time Stamp on Sensor: " + String(masterTempStorage[i].timeStamp));
+      }
+    }
+    //if flight recorder is requesting datas, place in the preflight buffer
+    if(status > 0){
+      bool done = false;
+      while(!done){
+        flightRecorderStorageIndex = flightRecorder.getRequestedBufferToStore(&flightRecorderStorageBuffer[0],256);
+        if(flightRecorderStorageIndex > 0){
+          //Serial.println("Requested store, storing to tempBuffer!");
+          preFlightCircularBuffer[preFlightCircularBufferIndex].buf = new byte[flightRecorderStorageIndex];
+          copyBuffer(&flightRecorderStorageBuffer[0],&preFlightCircularBuffer[preFlightCircularBufferIndex].buf[0], flightRecorderStorageIndex);
+          preFlightCircularBuffer[preFlightCircularBufferIndex].length = flightRecorderStorageIndex;
+          //Serial.println("Buffer to be recorded in index: " + String(preFlightCircularBufferIndex));
+          for(int i = 0; i < flightRecorderStorageIndex; i ++){
+            if(i%16 == 0) Serial.println();
+            Serial.print(String(preFlightCircularBuffer[preFlightCircularBufferIndex].buf[i]) + "\t");
+          }
+          //Serial.println("Free Memory: " + String(freeMemory()));
+          preFlightCircularBufferIndex ++;
+          if(preFlightCircularBufferIndex >= 128){
+            preFlightCircularBufferIndex = 0;
+            if(!preFlightCircularBufferFilledOnce) preFlightCircularBufferFilledOnce = true;
+          }
+        }
+        else{
+          done = true;
+        }
+      }
+    }
+
+    masterTempStorageMembers = 0;
+    status = handleComputerCommunication();
+  }
+  //go and dump the data
+  Serial.println("Dumping data!");
+
+  if(preFlightCircularBufferFilledOnce){
+    for(int i = 0; i < 128; i ++){
+      if(i + preFlightCircularBufferIndex >= 128){
+        storageController.write(&preFlightCircularBuffer[i + preFlightCircularBufferIndex - 128].buf[0], preFlightCircularBuffer[i + preFlightCircularBufferIndex - 128].length);
+      }
+      else{
+        storageController.write(&preFlightCircularBuffer[i + preFlightCircularBufferIndex].buf[0], preFlightCircularBuffer[i + preFlightCircularBufferIndex].length);
+      }
+    }
+  }
+  else{
+    for(uint i = 0; i < preFlightCircularBufferIndex; i ++){
+      Serial.println("Writing deprecated:");
+      Serial.println("Status: " + String(storageController.write(&preFlightCircularBuffer[i].buf[0], preFlightCircularBuffer[i].length)));
+      for(uint p = 0; p < preFlightCircularBuffer[i].length; p ++){
+        if(p%16 == 0) Serial.println();
+        Serial.print(String(preFlightCircularBuffer[i].buf[p]) + "\t");
+      }
+      Serial.println();
+    }
+  }
+  Serial.println("Wrote!");
+  storageController.close();
+}
+
+
+
 void flight(){
   int openStatus = storageController.open(FlashFAT::WRITE);
   Serial.println("Open Status: " + String(openStatus));
@@ -285,15 +466,19 @@ void wipeLastFile(){
 void setup() {
   Serial.begin(115200);
   delay(2000);
+  Serial.println("Free Memory: " + String(freeMemory()));
   flightRecorder.init();
   storageController.init();
   status = sensorPackage.init();
+  //storageController.eraseAllFiles();
   //wipeStorage();
   //wipeLastFile();
   Serial.println("Sensor Package init: " + String(status));
   //testCircularBuffer();
   //while(true);
   Serial.println("Beginning!");
+  Serial.println("Free Memory: " + String(freeMemory()));
+  preFlightWait();
   String message;
   //ComputerCommunication coms;
   //coms.init();
@@ -319,64 +504,6 @@ void setup() {
     }
     //delay(1);
   }
-
-  RocketData dummyAccel, dummyGyro;
-  dummyAccel.tag = FLIGHT_ACCEL_DATA_TAG;
-  dummyAccel.timeStamp = 100;
-  dummyAccel.data = new (float[3]){10,20,40};
-  dummyGyro.tag = FLIGHT_GYRO_DATA_TAG;
-  dummyGyro.timeStamp = 120;
-  dummyGyro.data = new float[3]{100,200,400};
-  ulong startTime = micros();
-  flightRecorder.update(dummyAccel);
-  ulong endTime = micros();
-  Serial.println("Elapsed: " + String(endTime - startTime));
-  flightRecorder.update(dummyGyro);
-  delay(1000);
-  int status = flightRecorder.update(dummyGyro);
-  Serial.println("FlightRecorder status: " + String(status));
-  byte tempBuffer[256];
-  startTime = micros();
-  int size = flightRecorder.getRequestedBufferToStore(&tempBuffer[0], 256);
-  endTime = micros();
-  Serial.println("Elapsed: " + String(endTime - startTime));
-  for(int i = 0; i < size; i ++){
-    if(i%16 == 0) Serial.println();
-    Serial.print(String(tempBuffer[i]) + "\t");
-  }
-  Serial.println("Done");
-  while(true);
-  /*
-  while(true){
-    if(coms.available()){
-      coms.readLine(&msg);
-      Serial.println("RECEIVED: " + msg);
-    }
-  }
-  //initFileSystem();
-  //makeDummyFlightFile();
-  //fileSystem.makeFileAllocationTable();
-
-  while(true){
-    while(computerBuffer.available() <=0){
-      delay(1);
-    }
-    computerBuffer.readLine(&message);
-    Serial.println("Recieved Message: " + message);
-    handleComputerCommunication(message);
-  }
-  */
-  /*
-  status = initFileSystem();
-  if(status < 0){
-    //major error detected
-    while(true);
-  }
-  if(status > 0){
-    //minor error detected
-    while(true);
-  }
-*/
 }
 
 void loop() {
