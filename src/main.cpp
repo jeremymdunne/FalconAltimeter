@@ -55,11 +55,141 @@ File Send testing
 int sendDataFile(uint fileIndex);
 int recoverFile(uint fileIndex);
 
+#define NOT_PHASE_CHANGE -1
+#define LAUNCH_PHASE_DETECTED 11
+#define COAST_PHASE_DETECTED 12
+#define APOGEE_DETECTED 13
+#define LANDING_DETECTED 14
+
+#define FLIGH_KINEMATICS_RAW_ALTITUDE_STORAGE_SIZE 8
+#define FLIGH_KINEMATICS_RAW_ACCELERATION_STORAGE_SIZE 8
+#define FLIGH_KINEMATICS_SMOOTHED_ALTITUDE_STORAGE_SIZE 8
+#define FLIGH_KINEMATICS_SMOOTHED_ACCELERATION_STORAGE_SIZE 8
+#define FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE 8
 
 class FlightKinematics{
+public:
+  int init();
+  int update(RocketData *newData, uint n);
+  float getAltitude();
+  float getVelocity();
 
+private:
+  RocketData rawAltitudeData[FLIGH_KINEMATICS_RAW_ALTITUDE_STORAGE_SIZE];
+  uint rawAltitudeDataIndex = 0;
+  bool rawAltitudeDataFilled = false;
+  RocketData rawAccelerationData[FLIGH_KINEMATICS_RAW_ACCELERATION_STORAGE_SIZE];
+  uint rawAccelerationDataIndex = 0;
+  bool rawAccelerationDataFilled = false;
+  RocketData smoothedAltitudeData[FLIGH_KINEMATICS_SMOOTHED_ALTITUDE_STORAGE_SIZE];
+  uint smootheddAltitudeDataIndex = 0;
+  bool smoothedAltitudeDataFilled = false;
+  RocketData smoothedAccelerationData[FLIGH_KINEMATICS_SMOOTHED_ACCELERATION_STORAGE_SIZE];
+  uint smoothedAccelerationDataIndex = 0;
+  bool smoothedAccelerationDataFilled = false;
+  RocketData clalculatedVelocityData[FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE];
+  uint clalculatedVelocityDataIndex = 0;
+  bool clalculatedVelocityDataFilled = false;
+
+  RocketData calculatedData[2];
+  //UpdateScheduler atltitudeScheduler, accelerationScheduler;
+  int updateAcceleration();
+  int updateAltitude();
 };
 
+int FlightKinematics::init(){
+  //setup schedulers
+  return 0;
+}
+
+int FlightKinematics::update(RocketData *newData, uint n){
+  //go iterate through the data, if we want it, copy it
+  for(uint i = 0; i < n; i ++){
+    if(newData[i].tag == FLIGHT_ACCEL_DATA_TAG){
+      rawAccelerationData[rawAccelerationDataIndex].timeStamp = newData[i].timeStamp;
+      rawAccelerationData[rawAccelerationDataIndex].data[0] = newData[i].data[0];
+      rawAccelerationData[rawAccelerationDataIndex].data[1] = newData[i].data[1];
+      rawAccelerationData[rawAccelerationDataIndex].data[2] = newData[i].data[2];
+      rawAccelerationDataIndex ++;
+      if(rawAccelerationDataIndex >= FLIGH_KINEMATICS_RAW_ACCELERATION_STORAGE_SIZE){
+        rawAccelerationDataIndex = 0;
+        if(!rawAccelerationDataFilled) rawAccelerationDataFilled = true;
+      }
+      updateAcceleration();
+    }
+    else if(newData[i].tag == FLIGHT_PRESSURE_ALTITUDE_DATA_TAG){
+      rawAltitudeData[rawAltitudeDataIndex].timeStamp = newData[i].timeStamp;
+      rawAltitudeData[rawAltitudeDataIndex].data[0] = newData[i].data[0];
+      if(rawAltitudeDataIndex >= FLIGH_KINEMATICS_RAW_ALTITUDE_STORAGE_SIZE){
+        rawAltitudeDataIndex = 0;
+        if(!rawAltitudeDataFilled) rawAltitudeDataFilled = true;
+      }
+      updateAltitude();
+
+    }
+  }
+  return 0;
+}
+
+#define RUNNING_AVERAGE_VELOCITY_ALGORITHM
+int FlightKinematics::updateAcceleration(){
+  //not gonna do anything special here for now
+  return 0;
+}
+
+int FlightKinematics::updateAltitude(){
+  //this is the interesting stuff
+  //smooth the altitude by, if applicable, looking at the previous velocity
+  //then smooth the velocity by the same operation
+  if(!clalculatedVelocityDataFilled){
+    //do nothing other than update the velocity
+    if(rawAltitudeDataIndex>0){
+      clalculatedVelocityData[clalculatedVelocityDataIndex].data[0] = (rawAltitudeData[rawAltitudeDataIndex].data[0] - rawAltitudeData[rawAltitudeDataIndex-1].data[0])/(rawAltitudeData[rawAltitudeDataIndex].timeStamp - rawAltitudeData[rawAltitudeDataIndex - 1].timeStamp)/1000.0;
+      clalculatedVelocityData[clalculatedVelocityDataIndex].timeStamp = rawAltitudeData[rawAltitudeDataIndex].timeStamp;
+      clalculatedVelocityDataIndex ++;
+      if(clalculatedVelocityDataIndex >= FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE){
+        clalculatedVelocityDataIndex = 0;
+        if(!clalculatedVelocityDataFilled) clalculatedVelocityDataFilled = true;
+      }
+      return 0;
+    }
+  }
+  //otherwise, use our techniques
+  //calculate the running average velocity
+  #ifdef RUNNING_AVERAGE_VELOCITY_ALGORITHM
+  float deltaAltitude = 0;
+  for(int i = 0; i < FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE - 1; i ++){
+    //do an area average
+    int counter = i + clalculatedVelocityDataIndex;
+    int next = counter + 1;
+    if(clalculatedVelocityDataIndex >= FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE){
+      counter -= FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE;
+    }
+    if(next >= FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE){
+      next -= FLIGH_KINEMATICS_CALCULATED_VELOCITY_STORAGE_SIZE;
+    }
+    deltaAltitude += clalculatedVelocityData[counter].data[0] * (clalculatedVelocityData[next].timeStamp - clalculatedVelocityData[counter].timeStamp)/1000.0;
+  }
+
+  #endif
+  return 0;
+}
+
+class FlightPhaseDetection{
+public:
+  int update(RocketData *newData, uint dataMembers);
+  int getCurrentPhase(FLIGHT_PHASES *phase);
+  int setPhase(FLIGHT_PHASES phase);
+private:
+  int checkForPhaseChange();
+  FLIGHT_PHASES currentPhase = WAITING_FOR_LAUNCH;
+};
+
+int FlightPhaseDetection::update(RocketData *newData, uint dataMembers){
+  return 0;
+}
+
+FlightKinematics kinematicEngine;
 
 
 class FlightController{
@@ -71,9 +201,6 @@ class FlightController{
 bool serialInterrupt = false;
 
 
-bool checkForLaunch(){
-  return false;
-}
 
 FLIGHT_PHASES currentPhase;
 
@@ -340,6 +467,65 @@ void handleDataRecoverMode(){
     }
   }
 }
+bool accelerationDetected = false;
+RocketData lastAltitudeData;
+RocketData suspectedLaunchAltitudeData;
+long sysMillisLaunchSuspected = 0;
+#define LAUNCH_ACCELERATION_DETECTION_THRESHOLD 20
+#define LAUNCH_DETECTION_WAIT_MILLIS 200
+#define LAUNCH_DETECTION_ALTITUDE_THRESHOLD 2
+
+bool checkForLaunch(RocketData *data, int n){
+  //quick and dirty
+  //register when a 'high' acceleration event has ocurred
+  //grab the altitude
+  //wait time t
+  //compare new altitude, if sufficiently high, we've launched!
+  if(!accelerationDetected){
+    //go through the data
+    for(int i = 0; i < n; i ++){
+      switch(data[i].tag){
+        case(FLIGHT_PRESSURE_ALTITUDE_DATA_TAG):
+          lastAltitudeData.data[0] = data[i].data[0];
+          lastAltitudeData.timeStamp = data[i].timeStamp;
+          break;
+        case(FLIGHT_ACCEL_DATA_TAG):
+          float linearAcceleration = pow(pow(data[i].data[0],2) + pow(data[i].data[1],2) + pow(data[i].data[2],2),.5);
+          if(linearAcceleration > LAUNCH_ACCELERATION_DETECTION_THRESHOLD){
+            accelerationDetected = true;
+            suspectedLaunchAltitudeData.data[0] = lastAltitudeData.data[0];
+            suspectedLaunchAltitudeData.timeStamp = lastAltitudeData.timeStamp;
+            Serial.println("Suspected launch");
+            sysMillisLaunchSuspected = millis();
+          }
+          break;
+      }
+    }
+  }
+  else{
+    //compare the times
+    for(int i = 0; i < n; i ++){
+      switch(data[i].tag){
+        case(FLIGHT_PRESSURE_ALTITUDE_DATA_TAG):
+          lastAltitudeData.data[0] = data[i].data[0];
+          lastAltitudeData.timeStamp = data[i].timeStamp;
+          break;
+        case(FLIGHT_ACCEL_DATA_TAG):
+          break;
+      }
+    }
+    if(millis() - sysMillisLaunchSuspected > LAUNCH_DETECTION_WAIT_MILLIS){
+        //compare the delta altitude
+        if(lastAltitudeData.data[0] - suspectedLaunchAltitudeData.data[0] > LAUNCH_DETECTION_ALTITUDE_THRESHOLD){
+          return true;
+        }
+        else{
+          accelerationDetected = false;
+        }
+    }
+  }
+  return false;
+}
 
 struct PreFlightDataStorage{
   byte *buf;
@@ -362,8 +548,9 @@ Also checks if the computer requests a data recovery mode and enters it appropri
 */
 void preFlightWait(){
   Serial.println("Storage status: " + String(storageController.open(FlashFAT::WRITE)));
-  long startM = millis();
-  while(millis() - startM < 15000){
+
+  bool hasLaunched = false;
+  while(!hasLaunched){
     //update sensors
     int numDataAvail = updateSensorPackage();
     //update flightRecorder
@@ -373,6 +560,7 @@ void preFlightWait(){
         //Serial.println("Time Stamp on Sensor: " + String(masterTempStorage[i].timeStamp));
       }
     }
+    hasLaunched = checkForLaunch(&masterTempStorage[0], numDataAvail);
     //if flight recorder is requesting datas, place in the preflight buffer
     if(status > 0){
       bool done = false;
@@ -400,7 +588,6 @@ void preFlightWait(){
         }
       }
     }
-
     masterTempStorageMembers = 0;
     status = handleComputerCommunication();
   }
