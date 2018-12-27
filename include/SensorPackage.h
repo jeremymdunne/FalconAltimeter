@@ -4,6 +4,7 @@
 #include "DataConfig.h"
 #include <UpdateScheduler.h>
 #include <BMP280.h>
+#include <MPU9250_IMU.h>
 //flags for sensors, used in return flags and sensor type flags
 
 
@@ -20,6 +21,7 @@
 
 
 #define BMP_280_PRESSURE_ALT
+
 
 #define BMP_280_PRESSURE_ALT_SENSOR
 #ifdef BMP_280_PRESSURE_ALT_SENSOR
@@ -79,9 +81,8 @@ private:
   #ifdef BMP_280_PRESSURE_ALT
     BMP280 bmp;
   #endif
-  #ifdef MPU9250_IMU
-    MPU9250_IMU imu;
-  #endif
+  MPU9250_IMU imu;
+  MPU9250_IMU::MPU_IMU_DATA imuData;
   #ifdef UBLOX_GPS
     UBLOX_GPS gps;
   #endif

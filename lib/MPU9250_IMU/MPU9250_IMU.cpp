@@ -19,89 +19,93 @@ void MPU9250_IMU::setUserCallbackFunction(void (*messageToUserCallback)(String))
 }
 
 void MPU9250_IMU::loadIMUCalibrationDataFromEEPROM(int startAddress){
-  uint16_t gyroOffsets[3];
-  uint16_t accelOffsets[3];
-  uint16_t magOffsets[3];
-  uint16_t magScales[3];
-  uint16_t orientationOffsets[3];
-  float scaledGyroOffsets[3];
-  float scaledAccelOffsets[3];
-  float scaledMagOffsets[3];
-  float scaledMagScales[3];
-  float scaledOrientationOffsets[3];
-  //go and grab the values
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_GYRO_X_OFFSET_EEPROM_OFFSET), &gyroOffsets[0]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_GYRO_Y_OFFSET_EEPROM_OFFSET), &gyroOffsets[1]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_GYRO_Z_OFFSET_EEPROM_OFFSET), &gyroOffsets[2]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ACCEL_X_OFFSET_EEPROM_OFFSET), &accelOffsets[0]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ACCEL_Y_OFFSET_EEPROM_OFFSET), &accelOffsets[1]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ACCEL_Z_OFFSET_EEPROM_OFFSET), &accelOffsets[2]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_X_OFFSET_EEPROM_OFFSET), &magOffsets[0]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Y_OFFSET_EEPROM_OFFSET), &magOffsets[1]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Z_OFFSET_EEPROM_OFFSET), &magOffsets[2]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_X_SCALE_EEPROM_OFFSET), &magScales[0]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Y_SCALE_EEPROM_OFFSET), &magScales[1]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Z_SCALE_EEPROM_OFFSET), &magScales[2]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ORIENTATION_X_OFFSET_EEPROM_OFFSET), &orientationOffsets[0]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ORIENTATION_Y_OFFSET_EEPROM_OFFSET), &orientationOffsets[1]);
-  EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ORIENTATION_Z_OFFSET_EEPROM_OFFSET), &orientationOffsets[2]);
-  for(int i = 0; i < 3; i ++){
-    scaledGyroOffsets[i] = (int16_t)gyroOffsets[i];
-    scaledAccelOffsets[i] = (int16_t)accelOffsets[i];
-    scaledMagOffsets[i] = (int16_t)magOffsets[i];
-    scaledMagScales[i] = (int16_t)magScales[i];
-    scaledOrientationOffsets[i] = (int16_t)orientationOffsets[i];
-    scaledGyroOffsets[i] /= MPU9250_IMU_GYRO_OFFSET_SCALE_EEPROM;
-    scaledAccelOffsets[i] /= MPU9250_IMU_ACCEL_OFFSET_SCALE_EEPROM;
-    scaledMagOffsets[i] /= MPU9250_IMU_MAG_OFFSET_SCALE_EEPROM;
-    scaledMagScales[i] /= MPU9250_IMU_MAG_SCALE_SCALE_EEPROM;
-    scaledOrientationOffsets[i] /= MPU9250_IMU_ORIENTATION_OFFSET_SCALE;
-    //reportToUser(scaledGyroOffsets[i]);
-    //reportToUser(scaledAccelOffsets[i]);
-    //reportToUser(scaledMagOffsets[i]);
-    //reportToUser(scaledMagScales[i]);
-    //reportToUser(scaledOrientationOffsets[i]);
-  }
-  //go ahead and write them
-  setCalibrationOffsets(&scaledGyroOffsets[0], &scaledAccelOffsets[0], &scaledMagOffsets[0], &scaledMagScales[0], &scaledOrientationOffsets[0]);
+  #ifdef USE_CALIBRATION_FROM_EEPROM
+    uint16_t gyroOffsets[3];
+    uint16_t accelOffsets[3];
+    uint16_t magOffsets[3];
+    uint16_t magScales[3];
+    uint16_t orientationOffsets[3];
+    float scaledGyroOffsets[3];
+    float scaledAccelOffsets[3];
+    float scaledMagOffsets[3];
+    float scaledMagScales[3];
+    float scaledOrientationOffsets[3];
+    //go and grab the values
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_GYRO_X_OFFSET_EEPROM_OFFSET), &gyroOffsets[0]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_GYRO_Y_OFFSET_EEPROM_OFFSET), &gyroOffsets[1]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_GYRO_Z_OFFSET_EEPROM_OFFSET), &gyroOffsets[2]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ACCEL_X_OFFSET_EEPROM_OFFSET), &accelOffsets[0]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ACCEL_Y_OFFSET_EEPROM_OFFSET), &accelOffsets[1]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ACCEL_Z_OFFSET_EEPROM_OFFSET), &accelOffsets[2]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_X_OFFSET_EEPROM_OFFSET), &magOffsets[0]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Y_OFFSET_EEPROM_OFFSET), &magOffsets[1]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Z_OFFSET_EEPROM_OFFSET), &magOffsets[2]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_X_SCALE_EEPROM_OFFSET), &magScales[0]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Y_SCALE_EEPROM_OFFSET), &magScales[1]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_MAG_Z_SCALE_EEPROM_OFFSET), &magScales[2]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ORIENTATION_X_OFFSET_EEPROM_OFFSET), &orientationOffsets[0]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ORIENTATION_Y_OFFSET_EEPROM_OFFSET), &orientationOffsets[1]);
+    EEPROM.read((uint16_t)(startAddress + MPU9250_IMU_ORIENTATION_Z_OFFSET_EEPROM_OFFSET), &orientationOffsets[2]);
+    for(int i = 0; i < 3; i ++){
+      scaledGyroOffsets[i] = (int16_t)gyroOffsets[i];
+      scaledAccelOffsets[i] = (int16_t)accelOffsets[i];
+      scaledMagOffsets[i] = (int16_t)magOffsets[i];
+      scaledMagScales[i] = (int16_t)magScales[i];
+      scaledOrientationOffsets[i] = (int16_t)orientationOffsets[i];
+      scaledGyroOffsets[i] /= MPU9250_IMU_GYRO_OFFSET_SCALE_EEPROM;
+      scaledAccelOffsets[i] /= MPU9250_IMU_ACCEL_OFFSET_SCALE_EEPROM;
+      scaledMagOffsets[i] /= MPU9250_IMU_MAG_OFFSET_SCALE_EEPROM;
+      scaledMagScales[i] /= MPU9250_IMU_MAG_SCALE_SCALE_EEPROM;
+      scaledOrientationOffsets[i] /= MPU9250_IMU_ORIENTATION_OFFSET_SCALE;
+      //reportToUser(scaledGyroOffsets[i]);
+      //reportToUser(scaledAccelOffsets[i]);
+      //reportToUser(scaledMagOffsets[i]);
+      //reportToUser(scaledMagScales[i]);
+      //reportToUser(scaledOrientationOffsets[i]);
+    }
+    //go ahead and write them
+    setCalibrationOffsets(&scaledGyroOffsets[0], &scaledAccelOffsets[0], &scaledMagOffsets[0], &scaledMagScales[0], &scaledOrientationOffsets[0]);
+  #endif
 }
 
 void MPU9250_IMU::saveIMUCalibrationDataToEEPROM(int startAddress, float *gyro, float *accel, float *mag, float *magScale, float *origOffset){
-  //TODO implement size check on signed 16 bit numbers
-  uint16_t gyroOffsets[3];
-  uint16_t accelOffsets[3];
-  uint16_t magOffsets[3];
-  uint16_t magScales[3];
-  uint16_t orientationOffsets[3];
-  reportToUser(mag[0]);
-  reportToUser(mag[1]);
-  reportToUser(mag[2]);
-  for(int i = 0; i < 3; i ++){
-    //cast to int16 and then unsigned
-    gyroOffsets[i] = (uint16_t)(int16_t)(gyro[i]*MPU9250_IMU_GYRO_OFFSET_SCALE_EEPROM);
-    accelOffsets[i] = (uint16_t)(int16_t)(accel[i]*MPU9250_IMU_ACCEL_OFFSET_SCALE_EEPROM);
-    magOffsets[i] = (uint16_t)(int16_t)(mag[i]*MPU9250_IMU_MAG_OFFSET_SCALE_EEPROM);
-    magScales[i] = (uint16_t)(int16_t)(magScale[i]*MPU9250_IMU_MAG_SCALE_SCALE_EEPROM);
-    orientationOffsets[i] = (uint16_t)(int16_t)(origOffset[i] * MPU9250_IMU_ORIENTATION_OFFSET_SCALE);
-  }
-  EEPROM.write(startAddress + MPU9250_IMU_GYRO_X_OFFSET_EEPROM_OFFSET, gyroOffsets[0]);
-  EEPROM.write(startAddress + MPU9250_IMU_GYRO_Y_OFFSET_EEPROM_OFFSET, gyroOffsets[1]);
-  EEPROM.write(startAddress + MPU9250_IMU_GYRO_Z_OFFSET_EEPROM_OFFSET, gyroOffsets[2]);
-  EEPROM.write(startAddress + MPU9250_IMU_ACCEL_X_OFFSET_EEPROM_OFFSET, accelOffsets[0]);
-  EEPROM.write(startAddress + MPU9250_IMU_ACCEL_Y_OFFSET_EEPROM_OFFSET, accelOffsets[1]);
-  EEPROM.write(startAddress + MPU9250_IMU_ACCEL_Z_OFFSET_EEPROM_OFFSET, accelOffsets[2]);
-  EEPROM.write(startAddress + MPU9250_IMU_MAG_X_OFFSET_EEPROM_OFFSET, magOffsets[0]);
-  EEPROM.write(startAddress + MPU9250_IMU_MAG_Y_OFFSET_EEPROM_OFFSET, magOffsets[1]);
-  EEPROM.write(startAddress + MPU9250_IMU_MAG_Z_OFFSET_EEPROM_OFFSET, magOffsets[2]);
-  EEPROM.write(startAddress + MPU9250_IMU_MAG_X_SCALE_EEPROM_OFFSET, magScales[0]);
-  EEPROM.write(startAddress + MPU9250_IMU_MAG_Y_SCALE_EEPROM_OFFSET, magScales[1]);
-  EEPROM.write(startAddress + MPU9250_IMU_MAG_Z_SCALE_EEPROM_OFFSET, magScales[2]);
-  //reportToUser(magOffsets[0]);
-  //reportToUser(magOffsets[1]);
-  //reportToUser(magOffsets[2]);
-  EEPROM.write(startAddress + MPU9250_IMU_ORIENTATION_X_OFFSET_EEPROM_OFFSET, orientationOffsets[0]);
-  EEPROM.write(startAddress + MPU9250_IMU_ORIENTATION_Y_OFFSET_EEPROM_OFFSET, orientationOffsets[1]);
-  EEPROM.write(startAddress + MPU9250_IMU_ORIENTATION_Z_OFFSET_EEPROM_OFFSET, orientationOffsets[2]);
+  #ifdef USE_CALIBRATION_FROM_EEPROM
+    //TODO implement size check on signed 16 bit numbers
+    uint16_t gyroOffsets[3];
+    uint16_t accelOffsets[3];
+    uint16_t magOffsets[3];
+    uint16_t magScales[3];
+    uint16_t orientationOffsets[3];
+    reportToUser(mag[0]);
+    reportToUser(mag[1]);
+    reportToUser(mag[2]);
+    for(int i = 0; i < 3; i ++){
+      //cast to int16 and then unsigned
+      gyroOffsets[i] = (uint16_t)(int16_t)(gyro[i]*MPU9250_IMU_GYRO_OFFSET_SCALE_EEPROM);
+      accelOffsets[i] = (uint16_t)(int16_t)(accel[i]*MPU9250_IMU_ACCEL_OFFSET_SCALE_EEPROM);
+      magOffsets[i] = (uint16_t)(int16_t)(mag[i]*MPU9250_IMU_MAG_OFFSET_SCALE_EEPROM);
+      magScales[i] = (uint16_t)(int16_t)(magScale[i]*MPU9250_IMU_MAG_SCALE_SCALE_EEPROM);
+      orientationOffsets[i] = (uint16_t)(int16_t)(origOffset[i] * MPU9250_IMU_ORIENTATION_OFFSET_SCALE);
+    }
+    EEPROM.write(startAddress + MPU9250_IMU_GYRO_X_OFFSET_EEPROM_OFFSET, gyroOffsets[0]);
+    EEPROM.write(startAddress + MPU9250_IMU_GYRO_Y_OFFSET_EEPROM_OFFSET, gyroOffsets[1]);
+    EEPROM.write(startAddress + MPU9250_IMU_GYRO_Z_OFFSET_EEPROM_OFFSET, gyroOffsets[2]);
+    EEPROM.write(startAddress + MPU9250_IMU_ACCEL_X_OFFSET_EEPROM_OFFSET, accelOffsets[0]);
+    EEPROM.write(startAddress + MPU9250_IMU_ACCEL_Y_OFFSET_EEPROM_OFFSET, accelOffsets[1]);
+    EEPROM.write(startAddress + MPU9250_IMU_ACCEL_Z_OFFSET_EEPROM_OFFSET, accelOffsets[2]);
+    EEPROM.write(startAddress + MPU9250_IMU_MAG_X_OFFSET_EEPROM_OFFSET, magOffsets[0]);
+    EEPROM.write(startAddress + MPU9250_IMU_MAG_Y_OFFSET_EEPROM_OFFSET, magOffsets[1]);
+    EEPROM.write(startAddress + MPU9250_IMU_MAG_Z_OFFSET_EEPROM_OFFSET, magOffsets[2]);
+    EEPROM.write(startAddress + MPU9250_IMU_MAG_X_SCALE_EEPROM_OFFSET, magScales[0]);
+    EEPROM.write(startAddress + MPU9250_IMU_MAG_Y_SCALE_EEPROM_OFFSET, magScales[1]);
+    EEPROM.write(startAddress + MPU9250_IMU_MAG_Z_SCALE_EEPROM_OFFSET, magScales[2]);
+    //reportToUser(magOffsets[0]);
+    //reportToUser(magOffsets[1]);
+    //reportToUser(magOffsets[2]);
+    EEPROM.write(startAddress + MPU9250_IMU_ORIENTATION_X_OFFSET_EEPROM_OFFSET, orientationOffsets[0]);
+    EEPROM.write(startAddress + MPU9250_IMU_ORIENTATION_Y_OFFSET_EEPROM_OFFSET, orientationOffsets[1]);
+    EEPROM.write(startAddress + MPU9250_IMU_ORIENTATION_Z_OFFSET_EEPROM_OFFSET, orientationOffsets[2]);
+  #endif
 }
 
 void MPU9250_IMU::setCalibrationOffsets(float *gyroOffset, float *accelOffset, float *magOffset, float *magScale, float *orientationOffsets){
@@ -388,7 +392,9 @@ int MPU9250_IMU::begin(int updateRate, int eepromOffset){
   //get basis
   //use accel to find default orientation
   //get initialization data
-  loadIMUCalibrationDataFromEEPROM(eepromCalibrationOffset);
+  #ifdef USE_CALIBRATION_FROM_EEPROM
+    loadIMUCalibrationDataFromEEPROM(eepromCalibrationOffset);
+  #endif
   mpu.readAll(&sensorData);
   //set the current data stuffs
   #ifdef LOW_PASS_ACCEL_FILTER

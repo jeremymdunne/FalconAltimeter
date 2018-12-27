@@ -2,7 +2,7 @@
 
 int SensorPackage::initIMU(){
   //todo
-  return 0;
+  return imu.begin();
 }
 
 int SensorPackage::initPressureSensor(){
@@ -32,8 +32,12 @@ int SensorPackage::init(){
     gpsUpdater.setUpdateFrequency(GPS_UPDATE_HERTZ);
   #endif
   #ifdef MEASURE_IMU
+    Serial.println("Initing IMU!");
     if(initIMU() != 0) return IMU_SENSOR_INIT_FAILURE;
     imuUpdater.setUpdateFrequency(IMU_UPDATE_HERTZ);
+    gyroData.data = new float[3]{};
+    magData.data = new float[3]{};
+    accelData.data = new float[3]{};
   #endif
 
   //init all the time based updaters
@@ -41,6 +45,23 @@ int SensorPackage::init(){
 }
 
 int SensorPackage::updateIMU(){
+  imu.update(); 
+  imu.getData(&imuData);
+  accelData.timeStamp = millis();
+  gyroData.timeStamp = millis();
+  magData.timeStamp = millis();
+  accelData.tag = FLIGHT_ACCEL_DATA_TAG;
+  gyroData.tag = FLIGHT_GYRO_DATA_TAG;
+  magData.tag = FLIGHT_MAG_DATA_TAG;
+  accelData.data[0] = imuData.accel[0];
+  accelData.data[1] = imuData.accel[1];
+  accelData.data[2] = imuData.accel[2];
+  gyroData.data[0] = imuData.rateOfRotation[0];
+  gyroData.data[1] = imuData.rateOfRotation[1];
+  gyroData.data[2] = imuData.rateOfRotation[2];
+  magData.data[0] = imuData.mag[0];
+  magData.data[1] = imuData.mag[1];
+  magData.data[2] = imuData.mag[2];
   return 0;
 }
 
@@ -81,6 +102,7 @@ int SensorPackage::getNewSensorData(RocketData *targetArray, int maxData){
           //Serial.println("Wrote");
           targetArray[counter] = pressureAltData;
           counter +=1;
+          newPressureData = false;
         }
       }
     }

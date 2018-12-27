@@ -40,7 +40,7 @@ private:
   int computeChecksum(String message);
   int requestResend();
   SerialBuffer computerBuffer;
-  String temp;
+  char *temp;
   String recievedMessages[8];
   int recievedMessagesIndex = 0;
 };

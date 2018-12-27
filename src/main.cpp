@@ -51,7 +51,7 @@ File Send testing
   requires high update speeds
 */
 
-
+void savePreFlightBuffer();
 int sendDataFile(uint fileIndex);
 int recoverFile(uint fileIndex);
 
@@ -467,13 +467,22 @@ void handleDataRecoverMode(){
     }
   }
 }
+
+bool minVelocityReached = false;
+RocketData altitudeDataAtMinVelocity;
+bool checkForLanding(RocketData *data, int n){
+  //conditions for landing:
+  // t seconds past in flight
+  // total delta m is < a
+  // average delta m < s
+
+}
+
 bool accelerationDetected = false;
 RocketData lastAltitudeData;
 RocketData suspectedLaunchAltitudeData;
 long sysMillisLaunchSuspected = 0;
-#define LAUNCH_ACCELERATION_DETECTION_THRESHOLD 20
-#define LAUNCH_DETECTION_WAIT_MILLIS 200
-#define LAUNCH_DETECTION_ALTITUDE_THRESHOLD 2
+
 
 bool checkForLaunch(RocketData *data, int n){
   //quick and dirty
@@ -481,15 +490,21 @@ bool checkForLaunch(RocketData *data, int n){
   //grab the altitude
   //wait time t
   //compare new altitude, if sufficiently high, we've launched!
+  lastAltitudeData.data = new float[1];
+  //Serial.println("Checking!");
   if(!accelerationDetected){
     //go through the data
     for(int i = 0; i < n; i ++){
       switch(data[i].tag){
         case(FLIGHT_PRESSURE_ALTITUDE_DATA_TAG):
+          //Serial.println("Pressure tag");
+          //Serial.println(" " + String(data[i].data[0]) + " " + String(data[i].timeStamp));
           lastAltitudeData.data[0] = data[i].data[0];
           lastAltitudeData.timeStamp = data[i].timeStamp;
+          //Serial.println("Pressure done");
           break;
         case(FLIGHT_ACCEL_DATA_TAG):
+          //Serial.println("Accel tag");
           float linearAcceleration = pow(pow(data[i].data[0],2) + pow(data[i].data[1],2) + pow(data[i].data[2],2),.5);
           if(linearAcceleration > LAUNCH_ACCELERATION_DETECTION_THRESHOLD){
             accelerationDetected = true;
@@ -524,6 +539,7 @@ bool checkForLaunch(RocketData *data, int n){
         }
     }
   }
+  //Serial.println("Done Checking!");
   return false;
 }
 
@@ -546,11 +562,16 @@ void copyBuffer(byte *source, byte *target, uint length){
 Controlls what to do for pre-launch purposes
 Also checks if the computer requests a data recovery mode and enters it appropriately
 */
+float altitudeAtLaunch = 0;
+
 void preFlightWait(){
   Serial.println("Storage status: " + String(storageController.open(FlashFAT::WRITE)));
-
+  Serial.println("Free Memory: " + String(freeMemory()));
   bool hasLaunched = false;
+  float runningAltitude = 0;
+  bool runningAltitudeFilled = false;
   while(!hasLaunched){
+    Serial.println("Free Memory: " + String(freeMemory()));
     //update sensors
     int numDataAvail = updateSensorPackage();
     //update flightRecorder
@@ -560,7 +581,22 @@ void preFlightWait(){
         //Serial.println("Time Stamp on Sensor: " + String(masterTempStorage[i].timeStamp));
       }
     }
+    if(numDataAvail > 0)
     hasLaunched = checkForLaunch(&masterTempStorage[0], numDataAvail);
+    if(!hasLaunched){
+      //go update the altitude datas
+      for(int i = 0; i < numDataAvail; i ++){
+        if(masterTempStorage[i].tag == FLIGHT_PRESSURE_ALTITUDE_DATA_TAG){
+          if(!runningAltitudeFilled){
+            runningAltitude = masterTempStorage[i].data[0];
+          }
+          else{
+              runningAltitude += masterTempStorage[i].data[0];
+              runningAltitude /= 2.0;
+          }
+        }
+      }
+    }
     //if flight recorder is requesting datas, place in the preflight buffer
     if(status > 0){
       bool done = false;
@@ -593,7 +629,20 @@ void preFlightWait(){
   }
   //go and dump the data
   Serial.println("Dumping data!");
+  savePreFlightBuffer();
+  Serial.println("Wrote!");
+  storageController.close();
+  altitudeAtLaunch = runningAltitude;
+  Serial.println("Altitude At Launch: " + String(altitudeAtLaunch));
+  Serial.println("Free Memory: " + String(freeMemory()));
+  //clear the memory buffer
+  for(int i = 0; i < 128; i ++){
+    delete &preFlightCircularBuffer[i];
+  }
+  Serial.println("Free Memory: " + String(freeMemory()));
+}
 
+void savePreFlightBuffer(){
   if(preFlightCircularBufferFilledOnce){
     for(int i = 0; i < 128; i ++){
       if(i + preFlightCircularBufferIndex >= 128){
@@ -615,10 +664,7 @@ void preFlightWait(){
       Serial.println();
     }
   }
-  Serial.println("Wrote!");
-  storageController.close();
 }
-
 
 
 void flight(){

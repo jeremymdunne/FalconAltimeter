@@ -2,7 +2,9 @@
 #define MPU9250_H_
 #include <Arduino.h>
 #include <MPU9250.h>
-#include <EEPROM.h>
+#ifdef USE_CALIBRATION_FROM_EEPROM
+  #include <EEPROM.h>
+#endif
 
 
 

@@ -1,9 +1,10 @@
 #include <SerialBuffer.h>
 
 
-int SerialBuffer::readLine(String *target){
+int SerialBuffer::readLine(char *target, uint length){
   if((available() == 1) | lineAvailable){
-    *target = newestMessage;
+    target = newestMessage;
+    length = strlen(newestMessage); 
     newestMessage = "";
     lineAvailable = false;
     serialBufferIndex = 0;
