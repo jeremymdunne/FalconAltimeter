@@ -9,8 +9,7 @@
 #define FLIGHT_RECORDER_MAX_RETURN_BUFFER_SIZE 256
 
 #define FLIGHT_RECORDER_CIRCULAR_BUFFER_ROWS          8
-#define FLIGHT_RECORDER_CIRCULAR_BUFFER_MAX_COLUMNS   32
-
+#define FLIGHT_RECORDER_CIRCULAR_BUFFER_MAX_COLUMNS   16
 #define DECODE_NOT_VALID_TAG -2
 #define DECODE_REQUEST_MODE_DATA 1
 
@@ -29,35 +28,33 @@ class FlightRecorder{
 public:
   int init();
   //returns any requests on data writing
-  int update(RocketData newData);
+  int update(RocketData *newData, uint n);
 
   //returns up to FLIGHT_RECORDER_MAX_RETURN_BUFFER_SIZE buffer to be written
   int encodeData(RocketData data);
   int scaleAndEncodeData(float data, uint numBytesToFill, int scale, byte*toFille);
-  int getNumberRequestedMessages();
   int getRequestedBufferToStore(byte *buffer, uint maxSize);
   int determineEncodingByteSize(int dataFlag);
   int determineEncodingByteSize(RocketData *data);
   int decodeBuffer(byte *buff, uint maxLength, RocketData *target);
-  float decodeAndScaleData(byte *buff, int byteLength, int scale);
+  float decodeAndScaleData(byte *buff, int byteLength, int scale, bool dataSigned = true);
+  int getRequestedDataToStore(RocketData *data, uint maxSize);
+  int encodeRocketData(RocketData *data, byte *target);
 private:
-  ulong lastRawDataWriteTime = 0;
-  ulong lastGPSDataWriteTime = 0;
-  ulong lastFlightApproximationDataWriteTime = 0;
-  RocketData accelData, pressureAltData, gyroData, magData, attitudeData, gpsData;
+  AccelData accelData;
+  GyroData gyroData;
+  MagData magData;
+  GpsData gpsData;
+  PressureAltitudeData pressureAltData;
+  EventData eventData;
   UpdateScheduler accelScheduler, gyroScheduler, magScheduler, gpsScheduler, atltitudeScheduler;
   //this is going to be a circular buffer
   //the amount of data available is the difference between the start read and write indexes
-  byte encodedData[FLIGHT_RECORDER_CIRCULAR_BUFFER_ROWS][FLIGHT_RECORDER_CIRCULAR_BUFFER_MAX_COLUMNS];
-  uint8 encodedDataSize[FLIGHT_RECORDER_CIRCULAR_BUFFER_ROWS];
-  int encodedDataStartReadIndex = 0;
-  int encodedDataWriteIndex = 0;
-  uint8 tempSize = 0;
+  bool newAccelData = false, newGyroData = false, newMagData = false, newGpsData = false, newPressureAltitudeData = false, newEvent = false;
+  uint tempSize = 0;
 
-  int encodeRocketData(RocketData *data, byte *target);
+
   int checkSchedulersForUpdates();
-  int addUpdateToBuffer(RocketData *toUpdate);
-
   int copyBuffer(byte *target, byte *source, uint size, uint targetOffset = 0, uint sourceOffset = 0);
 
 };

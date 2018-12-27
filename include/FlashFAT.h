@@ -9,7 +9,7 @@
 #define FILE_ALLOCATION_TABLE_ADDRESS (1<<12)
 #define SYSTEM_INFORMATION_LOCATION_ADDRESS 0
 #define STANDARD_TIMEMOUT_MILLIS 800
-#define USE_SERIAL_OUTPUT
+//#define USE_SERIAL_OUTPUT
 
 //errors and general reports
 #define NO_FILE_ALLOCATION_TABLE 1
@@ -22,6 +22,7 @@
 #define STORAGE_MEDIUM_TIMEOUT -10
 #define STORAGE_MEDIUM_INIT_FAILURE -11
 
+#define MAX_FILES 42 //1 256 page for the FAT used for now, so I can't go over that
 
 class FlashFAT{
 public:
@@ -32,7 +33,7 @@ public:
 
   struct FileAllocationTable{
     uint numFiles;
-    FileAllocationTableEntry files[256];
+    FileAllocationTableEntry files[MAX_FILES];
   };
 
   enum FILE_MODE{

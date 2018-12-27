@@ -80,7 +80,7 @@ ulong FlashFAT::getRemainingReadSize(){
     #endif
     return -1;
   }
-  return table.files[table.numFiles-1].size + table.files[table.numFiles-1].startAddress - currentAddress;
+  return table.files[currentFD].size + table.files[currentFD].startAddress - currentAddress;
 }
 
 int FlashFAT::read(byte *buf, uint length){
@@ -119,7 +119,7 @@ int FlashFAT::eraseLastFile(){
 
 int FlashFAT::close(){
   //close the modes and addresses
-  table.files[table.numFiles-1].size = currentAddress - table.files[table.numFiles-1].startAddress;;
+  table.files[table.numFiles-1].size = currentAddress - 1 - table.files[table.numFiles-1].startAddress;
   status = waitUntilFree();
   if(status != 0){
     #ifdef USE_SERIAL_OUTPUT

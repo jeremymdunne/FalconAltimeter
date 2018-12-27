@@ -25,19 +25,15 @@ int SensorPackage::init(){
   #ifdef MEASURE_PRESSURE
     if(initPressureSensor() != 0) return PRESSURE_SENSOR_INIT_FAILURE;
     pressureUpdater.setUpdateFrequency(PRESSURE_SENSOR_UPDATE_HERTZ);
-    pressureAltData.data = new float[2]{};
   #endif
   #ifdef MEASURE_GPS
     if(initGps() != 0) return GPS_SENSOR_INIT_FAILURE;
     gpsUpdater.setUpdateFrequency(GPS_UPDATE_HERTZ);
   #endif
   #ifdef MEASURE_IMU
-    Serial.println("Initing IMU!");
+    //Serial.println("Initing IMU!");
     if(initIMU() != 0) return IMU_SENSOR_INIT_FAILURE;
     imuUpdater.setUpdateFrequency(IMU_UPDATE_HERTZ);
-    gyroData.data = new float[3]{};
-    magData.data = new float[3]{};
-    accelData.data = new float[3]{};
   #endif
 
   //init all the time based updaters
@@ -45,7 +41,6 @@ int SensorPackage::init(){
 }
 
 int SensorPackage::updateIMU(){
-  imu.update(); 
   imu.getData(&imuData);
   accelData.timeStamp = millis();
   gyroData.timeStamp = millis();
@@ -71,7 +66,6 @@ int SensorPackage::updatePressureAlt(){
     pressureAltData.timeStamp = millis();
     pressureAltData.tag = FLIGHT_PRESSURE_ALTITUDE_DATA_TAG;
     pressureAltData.data[0] = bmp.getAltitudeFromBaselinePressure(baselinePressure);
-    pressureAltData.data[1] = bmp.getPressure();
     return 0;
   #endif
   return -1;
@@ -96,15 +90,13 @@ int SensorPackage::getNewSensorData(RocketData *targetArray, int maxData){
   #endif
   #ifdef MEASURE_PRESSURE
     if(newPressureData){
-      if(newPressureData){
         //Serial.println("Returning new pressure data");
-        if(maxData - counter > 1){
+        if(maxData - counter >= 1){
           //Serial.println("Wrote");
           targetArray[counter] = pressureAltData;
           counter +=1;
           newPressureData = false;
         }
-      }
     }
   #endif
   return counter;

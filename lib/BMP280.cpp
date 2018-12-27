@@ -142,9 +142,9 @@ float BMP280::getAltitudeFromBaselinePressure(float baseLinePressure){
       values->dig_P7 = (int16_t)(Wire.read()|(Wire.read()<<8));
       values->dig_P8 = (int16_t)(Wire.read()|(Wire.read()<<8));
       values->dig_P9 = (int16_t)(Wire.read()|(Wire.read()<<8));
-      //Serial.println(values->dig_T1);
-      //Serial.println(values->dig_T2);
-      //Serial.println(values->dig_T3);
+      Serial.println(values->dig_T1);
+      Serial.println(values->dig_T2);
+      Serial.println(values->dig_T3);
       return 0;
     }
     return BMP180_CALIBRATION_DATA_READ_FAILURE;

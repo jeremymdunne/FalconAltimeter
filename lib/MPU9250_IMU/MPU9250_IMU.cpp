@@ -379,7 +379,7 @@ int MPU9250_IMU::getData(MPU_IMU_DATA *data){
 int MPU9250_IMU::begin(int updateRate, int eepromOffset){
   //userCallback = reportToUser;
   microsBetweenUpdates = (long) (1000000.0/updateRate +.5);
-  Serial.println(microsBetweenUpdates);
+  //Serial.println(microsBetweenUpdates);
   delay(1000);
   int mpuStatusCode = mpu.begin(MPU9250::MPU9250_GYRO_RANGE_2000_DPS,MPU9250::MPU9250_ACCEL_RANGE_8_GPS);
   if(mpuStatusCode != 0){

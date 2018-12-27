@@ -1,25 +1,24 @@
 #ifndef _DATA_CONFIG_H_
 #define _DATA_CONFIG_H_
+#include <Arduino.h>
 
 #define SEND_FILE "SF"
+
 #define SEND_FAT_TABLE "ST"
 #define WRITE_CONFIGURATION "WC"
+#define ERASE_LAST_FILE "EL"
 #define ERASE_FILE "FE"
+#define ERASE_ALL_FILES "EA"
 #define SEND_CONFIGURATION "SC"
 #define SEND_ERROR "ERR:"
 
-//#define STORE_DATA
+#define STORE_DATA
+#define PRINT_STORAGE_BUFFERS
 
 #define MEASURE_IMU
 #define MEASURE_PRESSURE
 //#define MEASURE_GPS
 
-
-//these are flags that can be commented out as needed
-//#define GPS
-#define ACCEL
-#define GYRO
-#define PRESSURE_ALT
 //#define RADIO_TELEMETRY
 #define SERIAL_FEED_THROUGH
 
@@ -27,22 +26,6 @@ enum FLIGHT_PHASES{
   WAITING_FOR_LAUNCH,BOOST_PHASE,COAST_PHASE,APOGEE,RECOVERY,LANDING,STANDBY
 };
 //flight
-#define FLIGHT_DATA_STORAGE_HERTZ_DURING_FLIGHT 20
-#define GPS_DATA_STORAGE_HERTZ_DURING_FLIGHT 1
-#define FLIGHT_ESTIMATION_STORAGE_HERTZ_DURING_FLIGHT 2
-
-#define FLIGHT_DATA_TELEMETRY_HERTZ_DURING_FLIGHT 2
-#define GPS_DATA_TELEMETRY_HERTZ_DURING_FLIGHT .5
-#define FLIGHT_ESTIMATION_TELEMETRY_HERTZ_DURING_FLIGHT .5
-//recovery
-#define FLIGHT_DATA_STORAGE_HERTZ_DURING_RECOVERY 2
-#define GPS_DATA_STORAGE_HERTZ_DURING_RECOVERY 1
-#define FLIGHT_ESTIMATION_STORAGE_HERTZ_DURING_RECOVERY 0
-
-#define FLIGHT_DATA_TELEMETRY_HERTZ_DURING_RECOVERY 2
-#define GPS_DATA_TELEMETRY_HERTZ_DURING_RECOVERY .5
-#define FLIGHT_ESTIMATION_TELEMETRY_HERTZ_DURING_RECOVERY 0
-
 #define PRE_LAUNCH_BUFFER_MILLIS 5000
 
 #define PRE_LAUNCH_RAW_FLIGHT_BUFFER_SIZE PRE_LAUNCH_BUFFER_MILLIS/1000*FLIGHT_DATA_STORAGE_HERTZ_DURING_FLIGHT
@@ -52,9 +35,10 @@ enum FLIGHT_PHASES{
 
 //launch + landing conditions to be determined in the flash
 //launch conditions
-#define LAUNCH_ACCELERATION_DETECTION_THRESHOLD 20
+#define LAUNCH_ACCELERATION_DETECTION_THRESHOLD 2
 #define LAUNCH_DETECTION_WAIT_MILLIS 200
-#define LAUNCH_DETECTION_ALTITUDE_THRESHOLD 2
+#define LAUNCH_DETECTION_ALTITUDE_THRESHOLD_WITH_ACCELERATION_DETECTION .5
+#define LAUNCH_DETECTION_ALTITUDE_WITHOUT_ACCELERATION_DETECTION 1.5
 
 #define LANDING_DETECTION_MINUMUM_ELAPSED_FLIGHT_TIME 4000
 #define LANDING_DETECTION_MINUMUM_VELOCITY 1
@@ -66,7 +50,7 @@ enum FLIGHT_PHASES{
 
 #define PRE_LAUNCH_BUFFER_MILLIS 5000
 
-#include <Arduino.h>
+
 
 
 //Storage methods
@@ -91,11 +75,11 @@ as well as the meaning of all the data.
 
 //event/data specific definitions
 #define FLIGHT_RECORDER_ACCEL_DATA_BYTE_SIZE_PER_AXIS 3
-#define FLIGHT_RECORDER_ACCEL_DATA_SCALE_FACTOR       300
+#define FLIGHT_RECORDER_ACCEL_DATA_SCALE_FACTOR       20
 #define FLIGHT_RECORDER_ACCEL_DATA_RECORDING_HERTZ    20
 
 #define FLIGHT_RECORDER_GYRO_DATA_BYTE_SIZE_PER_AXIS 3
-#define FLIGHT_RECORDER_GYRO_DATA_SCALE_FACTOR       1
+#define FLIGHT_RECORDER_GYRO_DATA_SCALE_FACTOR       17
 #define FLIGHT_RECORDER_GYRO_DATA_RECORDING_HERTZ    10
 
 #define FLIGHT_RECORDER_MAG_DATA_BYTE_SIZE_PER_AXIS 3
@@ -130,17 +114,60 @@ as well as the meaning of all the data.
 #define FLIGHT_AIR_BRAKE_DEPLOYMENT_EVENT_TAG         60
 #define FLIGHT_AIR_BRAKE_RETRACTED_EVENT_TAG          61
 
+//supported data and type declarations
 struct RocketData{
-  uint8 tag;
   ulong timeStamp;
-  float *data; //preserve memory if possible, write over this if needed
-  uint8 numMembers = 2; //should reflect the number of members in data[]
+  uint8 tag;
+  float *data;
 };
 
-struct GeneralEncodingStructure{
-  uint8 tag;
-  ulong timeStamp;
-
+struct AccelData : public RocketData{
+  AccelData(){
+    data = new float[3];
+    tag = FLIGHT_ACCEL_DATA_TAG;
+  }
 };
+
+struct GyroData : public RocketData{
+  GyroData(){
+    data = new float[3];
+    tag = FLIGHT_GYRO_DATA_TAG;
+  }
+};
+
+struct MagData : public RocketData{
+  MagData(){
+    data = new float[3];
+    tag = FLIGHT_MAG_DATA_TAG;
+  }
+};
+
+struct PressureAltitudeData : public RocketData{
+  PressureAltitudeData(){
+    data = new float;
+    tag = FLIGHT_PRESSURE_ALTITUDE_DATA_TAG;
+  }
+};
+
+struct GpsData : public RocketData{
+  GpsData(){
+    data = new float[2];
+    tag = FLIGHT_GPS_DATA_TAG;
+  }
+};
+
+struct PreFlightAllocation : public RocketData{
+  PreFlightAllocation(){
+    data = new float[3]{0,0,0};
+  }
+};
+
+struct EventData : public RocketData{
+  EventData(){
+
+  }
+};
+
+
 
 #endif

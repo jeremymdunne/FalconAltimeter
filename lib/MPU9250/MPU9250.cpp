@@ -221,7 +221,7 @@ int MPU9250::initAK8963(){
 }
 
 bool MPU9250::checkAK8963(){
-  Serial.println("Mag init: Who am I: " + String(ak8963Read8(AK8963_WHO_AM_I)));
+  //Serial.println("Mag init: Who am I: " + String(ak8963Read8(AK8963_WHO_AM_I)));
   if(ak8963Read8(AK8963_WHO_AM_I) != AK8963_WHO_AM_I_RESPONSE){
     return false;
   }
@@ -269,7 +269,7 @@ void MPU9250::resetDevice(){
 bool MPU9250::checkMPU(){
   if(mpuRead8(MPU9250_WHO_AM_I) != MPU9250_WHO_AM_I_RESPONSE && mpuRead8(MPU9250_WHO_AM_I) != MPU9250_WHO_AM_I_RESPONSE_2){
     while(true){
-      Serial.println(mpuRead8(MPU9250_WHO_AM_I),HEX);
+      //Serial.println(mpuRead8(MPU9250_WHO_AM_I),HEX);
     }
 
     return false;

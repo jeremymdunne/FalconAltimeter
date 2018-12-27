@@ -69,7 +69,11 @@ public:
 private:
   byte sensorEnabledStatus; //made up of the sensor flags to show enabled, disabled means a 0
   UpdateScheduler imuUpdater, pressureUpdater, gpsUpdater;
-  RocketData accelData, gyroData, magData, gpsData, pressureAltData;
+  AccelData accelData;
+  GyroData gyroData;
+  MagData magData;
+  GpsData gpsData;
+  PressureAltitudeData pressureAltData;
   int initGps();
   int initIMU();
   int initPressureSensor();
