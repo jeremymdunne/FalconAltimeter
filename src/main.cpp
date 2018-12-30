@@ -30,15 +30,24 @@ SensorPackage sensorPackage;
 FlightRecorder flightRecorder;
 FlashFAT storage;
 HostCommunicator host;
-//AccelData tempData;
-//GyroData tempData1;
-//RocketData rocketData[51];
-//AccelData tempData1;
 
 #define PRE_FLIGHT_BUFFER_ROCKET_DATA_SIZE 128
 
 String rocketDataToString(RocketData *data);
-
+int recoverFile(uint fileIndex);
+int sendDataFile(uint fileIndex);
+int sendFileAllocationTable();
+int handleComputerCommunication();
+String rocketDataToString(RocketData *data);
+bool checkForLaunch(RocketData *rawSensorData, uint length);
+void copyRocketDataToTarget(RocketData *target, RocketData *source);
+int updateSensors(RocketData *sensorData, uint max);
+int handleRocketDataStorage(RocketData *data, uint n = 1);
+int preFlightWait();
+int handleHostCommunications();
+bool checkForLanding();
+int handleFlight();
+void flightController();
 
 int recoverFile(uint fileIndex){
   //double check the fileIndex

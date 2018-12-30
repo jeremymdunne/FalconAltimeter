@@ -1,11 +1,54 @@
+FalconAltimeter V1
 
-This directory is intended for PIO Unit Testing and project tests.
+Author: Jeremy Dunne
 
-Unit Testing is a software testing method by which individual units of
-source code, sets of one or more MCU program modules together with associated
-control data, usage procedures, and operating procedures, are tested to
-determine whether they are fit for use. Unit testing finds problems early
-in the development cycle.
+Description:
+  Simple flight altimeter intended for rockets. Records and stores data from sensors including
+  Gyroscope, Accelerometer, Magnetometer, Pressure, Temperature, and GPS. Future upgrades include
+  adding pyro charges and defining parameters to fire them.
 
-More information about PIO Unit Testing:
-- https://docs.platformio.org/page/plus/unit-testing.html
+  Intended to run on an stm32f103 processor using an MPU9250 9-Axis IMU, BMP280, and standard UART GPS.
+
+  Future additions:
+    Pyro Charges for recovery
+    User-defined information storage rates for all phases of flight
+    Real-time telemetry, safeties, pyro overrides
+
+  Future Future additions:
+    Air-brake control for Spaceport America Cup
+    Thrust-Vectoring-Control, active stabilization control
+    Multi-stage communication
+
+Why am I making this:
+  I am part of Case Western's Rocket Team, which is participating in the Spaceport America Cup competition.
+  I am making this to control an airbrake on the rocket to minimize our distance from the target altitude.
+  To do this, I am making a full-on flight recorder with pyro control and other features
+
+How the software works:
+  Just to be clear: I am a Freshman Mechanical Engineering student. I do not pretend to be a 'comp sci wiz'
+  but believe I am competent enough to make this system. Because of this though, I may do things in ways that
+  are obviously wrong in some fashion.... If this is to be the case, I welcome suggestions!
+
+  The program format is as follows (please excuse any lack of documentation...)
+
+  The main program runs a tight control loop that polls 'modules' with new information collected from previous
+  modules. The sensor module is updated first, which collects any new sensor information and returns that. This
+  information is then added to by other modules, such as the kinematic engines, as necessary. The FlightRecorder
+  then takes all new information, and stores the particular information at a certain rate. Modules keep track of
+  old data as necessary in order to limit memory usage. At the end of the loop, any unused data is discarded, and
+  the loop begins again.
+
+  Why did I use this format? My thinking was to use modules to abstract the altimeter, making it easy to add other
+  modules that required rocket flight data. For instance, an active stabilization controller would need access to
+  virtually all new sensor data every loop for its algorithms. Using this method, it is easy to add and remove
+  modules as needed.
+
+  Other important things to note is the pre-flight wait, which stores up to n number of events that the flight
+  recorder wishes to store, until a flight is actually detected. This is done primarily to preserve the volume of
+  information stored on to the data medium, if the rocket sits for 30 minutes before launch, there is no need to
+  record that 30 minutes of useless flight data.
+
+  On the subject of data storage mediums, I decided to go with using a flash storage chip using a SPI interface.
+  I was originally using sd cards as storage, until problems in both their storage latency times and their
+  non-robustness forced a switch. The end product will be completely 'solid-state' and will survive
+  high-acceleration launches and unexpectedly high-acceleration landings... 
