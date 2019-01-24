@@ -1,0 +1,50 @@
+#ifndef _DATA_STORAGE_PARAMETERS_H_
+#define _DATA_STORAGE_PARAMETERS_H_
+/*
+Defines the size, scales, and placements of data when recording to the storage.
+This is needed as data is stored in a flash-spi chip in 8 bit segments.
+Floating point numbers are not stored for data size reason, so they are scaled
+to maintain some accuracy.
+
+If you are trying to parce the data file, this is what you need.
+*/
+
+
+
+//all data members share these parameters
+#define DATA_STORAGE_TIME_STAMP_BYTE_SIZE 3
+#define DATA_STORAGE_TIME_STAMP_SCALE_FACTOR 1
+#define DATA_STORAGE_TAG_BYTE_SIZE 1
+#define DATA_STORAGE_TAG_SCALE_FACTOR 1
+
+//event/data specific definitions
+#define DATA_STORAGE_ACCEL_DATA_BYTE_SIZE_PER_AXIS 3
+#define DATA_STORAGE_ACCEL_DATA_SCALE_FACTOR       200
+#define DATA_STORAGE_ACCEL_DATA_RECORDING_HERTZ    20
+
+#define DATA_STORAGE_GYRO_DATA_BYTE_SIZE_PER_AXIS 3
+#define DATA_STORAGE_GYRO_DATA_SCALE_FACTOR       17
+#define DATA_STORAGE_GYRO_DATA_RECORDING_HERTZ    10
+
+#define DATA_STORAGE_MAG_DATA_BYTE_SIZE_PER_AXIS 3
+#define DATA_STORAGE_MAG_DATA_SCALE_FACTOR       1
+#define DATA_STORAGE_MAG_DATA_RECORDING_HERTZ    10
+
+#define DATA_STORAGE_GPS_DATA_BYTE_SIZE_PER_AXIS 3
+#define DATA_STORAGE_GPS_DATA_SCALE_FACTOR       1
+#define DATA_STORAGE_GPS_DATA_RECORDING_HERTZ  1
+
+#define DATA_STORAGE_PRESSURE_ALTITUDE_BYTE_SIZE 3
+#define DATA_STORAGE_PRESSURE_ALTITUDE_SCALE_FACTOR 550
+#define DATA_STORAGE_PRESSURE_ALTITUDE_DATA_RECORDING_HERTZ    5
+
+#define DATA_STORAGE_FILTERED_ALTITUDE_BYTE_SIZE 3
+#define DATA_STORAGE_FILTERED_ALTITUDE_SCALE_FACTOR 550
+#define DATA_STORAGE_FILTERED_ALTITUDE_DATA_RECORDING_HERTZ    5
+
+#define DATA_STORAGE_FILTERED_VELOCITY_BYTE_SIZE 3
+#define DATA_STORAGE_FILTERED_VELOCITY_SCALE_FACTOR 17
+#define DATA_STORAGE_FILTERED_VELOCITY_DATA_RECORDING_HERTZ    5
+
+
+#endif
