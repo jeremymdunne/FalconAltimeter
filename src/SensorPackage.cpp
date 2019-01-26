@@ -60,9 +60,9 @@ int SensorPackage::updateIMU(){
   //Serial.println("Getting IMU Data!");
   runningData.imuData.timestamp = millis();
 
-  runningData.imuData.acceleration[0] = imuData.accel[0];
-  runningData.imuData.acceleration[1] = imuData.accel[1];
-  runningData.imuData.acceleration[2] = imuData.accel[2];
+  runningData.imuData.acceleration[0] = imuData.accel[0] * 9.81;
+  runningData.imuData.acceleration[1] = imuData.accel[1] * 9.81;
+  runningData.imuData.acceleration[2] = imuData.accel[2] * 9.81;
   runningData.imuData.angularRate[0] = imuData.rateOfRotation[0];
   runningData.imuData.angularRate[1] = imuData.rateOfRotation[1];
   runningData.imuData.angularRate[2] = imuData.rateOfRotation[2];

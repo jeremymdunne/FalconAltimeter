@@ -75,8 +75,8 @@ public:
   int translateNext(uint8_t *dataToRead, uint length, float *target, uint targetLen);
 
 
-  int decodeAndScaleData(byte *buff, int byteLength, int scale, bool dataSigned = true);
-  
+  float decodeAndScaleData(byte *buff, int byteLength, int scale, bool dataSigned = true);
+
   int scaleAndEncodeData(float data, uint numBytesToFill, int scale, byte*toFill);
   int determineEncodingByteSize(int dataFlag);
   int encodeData(int dataFlag, long timeStamp, float *data, uint8_t *target);

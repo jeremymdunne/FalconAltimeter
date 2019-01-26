@@ -16,8 +16,12 @@ This file contains all program-wide definitions, declerations, constants, etc.
 Generic phases for the rocket to be in
 */
 enum Flight_Phase{
-  WAITING_FOR_LAUNCH_PHASE, BOOST_PHASE, COAST_PHASE, APOGEE_PHASE, RECOVER_PHASE, LANDING_PHASE, STANDOWN_PHASE, DATA_RECOVERY_PHASE
+  WAITING_FOR_LAUNCH_PHASE, BOOST_PHASE, COAST_PHASE, APOGEE_PHASE, RECOVERY_PHASE, LANDING_PHASE, STANDOWN_PHASE, DATA_RECOVERY_PHASE
 };
+
+#define LAUNCH_DETECTION_MINUMUM_ACCELERATION 15 //m/s^2
+#define LAUNCH_DETECTION_ACCELERATION_ELAPSED_TIME 300 //ms
+
 
 /*
 standard barometric data from sensor.
@@ -65,8 +69,8 @@ struct Rocket_State{
   GPS_Data primaryGPSdata;
 
   long updateMicros = 1000; //the average loop time of the program
-
-  Flight_Phase currentFlightPhase;
+  long sysMillisTimeStamp = 0;
+  Flight_Phase currentFlightPhase = WAITING_FOR_LAUNCH_PHASE;
 };
 
 /*
@@ -129,21 +133,47 @@ namespace RocketHelper{
     copyIMUdata(&target->primaryIMUdata,&source->primaryIMUdata);
     copyGPSdata(&target->primaryGPSdata, &source->primaryGPSdata);
     target->updateMicros = source->updateMicros;
+    target->sysMillisTimeStamp = source->sysMillisTimeStamp;
     return 0;
+  }
+
+  static float getLinearAcceleration(IMU_Data *data){
+    return pow(pow(data->acceleration[0],2) + pow(data->acceleration[1],2) + pow(data->acceleration[2],2),.5);
   }
 
   static void printRocketState(Rocket_State *state){
     Serial.println("Pressure: " + String(state->primaryBarometricData.pressure));
     Serial.println("Temperature: " + String(state->primaryBarometricData.temperature));
     Serial.println("Pressure Altitude: " + String(state->primaryBarometricData.altitude));
-
     Serial.println("IMU Acceleration (XYZ): " + String(state->primaryIMUdata.acceleration[0]) + ";" + String(state->primaryIMUdata.acceleration[1]) + ";" + String(state->primaryIMUdata.acceleration[2]));
-
-
+    Serial.println("Linear Acceleration: " + String(getLinearAcceleration(&state->primaryIMUdata)));
     Serial.println("Update Micros: " + String(state->updateMicros));
-
+    String phase = "";
+    switch(state->currentFlightPhase){
+      case(WAITING_FOR_LAUNCH_PHASE):
+        phase = "WAITING FOR LAUNCH";
+        break;
+      case(BOOST_PHASE):
+        phase = "BOOST PHASE";
+        break;
+      case(COAST_PHASE):
+        phase = "COAST PHASE";
+        break;
+      case(APOGEE_PHASE):
+        phase = "APOGEE PHASE";
+        break;
+      case(RECOVERY_PHASE):
+        phase = "RECOVERY PHASE";
+        break;
+      case(LANDING_PHASE):
+        phase = "LANDING PHASE";
+        break;
+      case(DATA_RECOVERY_PHASE):
+        phase = "DATA_RECOVERY_PHASE";
+        break;
+    }
+    Serial.println("Flight Phase: " + phase);
   }
-
 }
 
 #endif

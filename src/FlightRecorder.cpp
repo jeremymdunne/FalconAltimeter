@@ -199,7 +199,56 @@ int FlightRecorder::translateNext(uint8_t *dataToRead, uint length, float *targe
   //determine the byte size of the message
   int size = determineEncodingByteSize(flag);
   if(size < 0) //some sort of error
-  return -1; 
+  return -1;
+  if(length < size) //not long enough
+  return -2;
+
+  target[0] = flag;
+  //grab the timestamp
+  target[1] = decodeAndScaleData(&dataToRead[DATA_STORAGE_TAG_BYTE_SIZE], DATA_STORAGE_TIME_STAMP_BYTE_SIZE, DATA_STORAGE_TIME_STAMP_SCALE_FACTOR, false);
+  uint tempSize = DATA_STORAGE_TAG_BYTE_SIZE + DATA_STORAGE_TIME_STAMP_BYTE_SIZE;
+  //alright, now actually decode it...
+  size = 2; //timestamp + flag
+  switch(flag){
+    case(RAW_ACCEL_DATA_TAG):
+      target[2] = decodeAndScaleData(&dataToRead[tempSize], DATA_STORAGE_ACCEL_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_ACCEL_DATA_SCALE_FACTOR, true);
+      target[3] = decodeAndScaleData(&dataToRead[tempSize + DATA_STORAGE_ACCEL_DATA_BYTE_SIZE_PER_AXIS], DATA_STORAGE_ACCEL_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_ACCEL_DATA_SCALE_FACTOR, true);
+      target[4] = decodeAndScaleData(&dataToRead[tempSize + 2*DATA_STORAGE_ACCEL_DATA_BYTE_SIZE_PER_AXIS], DATA_STORAGE_ACCEL_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_ACCEL_DATA_SCALE_FACTOR, true);
+      tempSize += 3* DATA_STORAGE_ACCEL_DATA_BYTE_SIZE_PER_AXIS;
+      size += 3;
+      break;
+    case(RAW_ANGULAR_RATE_DATA_TAG):
+      target[2] = decodeAndScaleData(&dataToRead[tempSize], DATA_STORAGE_GYRO_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_GYRO_DATA_SCALE_FACTOR, true);
+      target[3] = decodeAndScaleData(&dataToRead[tempSize + DATA_STORAGE_GYRO_DATA_BYTE_SIZE_PER_AXIS], DATA_STORAGE_GYRO_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_GYRO_DATA_SCALE_FACTOR, true);
+      target[4] = decodeAndScaleData(&dataToRead[tempSize + 2*DATA_STORAGE_GYRO_DATA_BYTE_SIZE_PER_AXIS], DATA_STORAGE_GYRO_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_GYRO_DATA_SCALE_FACTOR, true);
+      tempSize += 3* DATA_STORAGE_GYRO_DATA_BYTE_SIZE_PER_AXIS;
+      size += 3;
+      break;
+    case(RAW_MAGNETIC_FIELD_DATA_TAG):
+      target[2] = decodeAndScaleData(&dataToRead[tempSize], DATA_STORAGE_MAG_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_MAG_DATA_SCALE_FACTOR, true);
+      target[3] = decodeAndScaleData(&dataToRead[tempSize + DATA_STORAGE_MAG_DATA_BYTE_SIZE_PER_AXIS], DATA_STORAGE_MAG_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_MAG_DATA_SCALE_FACTOR, true);
+      target[4] = decodeAndScaleData(&dataToRead[tempSize + 2*DATA_STORAGE_MAG_DATA_BYTE_SIZE_PER_AXIS], DATA_STORAGE_MAG_DATA_BYTE_SIZE_PER_AXIS, DATA_STORAGE_MAG_DATA_SCALE_FACTOR, true);
+      tempSize += 3* DATA_STORAGE_MAG_DATA_BYTE_SIZE_PER_AXIS;
+      size += 3;
+      break;
+    case(RAW_PRESSURE_ALTITUDE_TAG):
+      target[2] = decodeAndScaleData(&dataToRead[tempSize], DATA_STORAGE_PRESSURE_ALTITUDE_BYTE_SIZE, DATA_STORAGE_PRESSURE_ALTITUDE_SCALE_FACTOR, true);
+      tempSize += DATA_STORAGE_PRESSURE_ALTITUDE_BYTE_SIZE;
+      size += 1;
+      break;
+    case(RAW_PRESSURE_TAG):
+      target[2] = decodeAndScaleData(&dataToRead[tempSize], DATA_STORAGE_PRESSURE_BYTE_SIZE, DATA_STORAGE_PRESSURE_SCALE_FACTOR, true);
+      tempSize += DATA_STORAGE_PRESSURE_BYTE_SIZE;
+      size += 1;
+      break;
+    case(RAW_TEMPERATURE_DATA_TAG):
+      target[2] = decodeAndScaleData(&dataToRead[tempSize], DATA_STORAGE_TEMPERATURE_BYTE_SIZE, DATA_STORAGE_TEMPERATURE_SCALE_FACTOR, true);
+      tempSize += DATA_STORAGE_TEMPERATURE_BYTE_SIZE;
+      size += 1;
+      break;
+  }
+  return size;
+
 }
 
 //combines the necessary bytes and scales
